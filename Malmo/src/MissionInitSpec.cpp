@@ -20,9 +20,11 @@
 // Local:
 #include "FindSchemaFile.h"
 #include "MissionInitSpec.h"
+#include "Init.h"
 
 // Boost:
 #include <boost/make_shared.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
 // Schemas:
 using namespace malmo::schemas;
@@ -35,12 +37,17 @@ namespace malmo
 {
     MissionInitSpec::MissionInitSpec( const MissionSpec& mission_spec, std::string unique_experiment_id, int role )
     {
+        initialiser::initXSD();
+
         // construct a default MissionInit using the provided MissionSpec
         const string client_IP_address = "127.0.0.1";
         const int client_commands_port = 0;
         const string agent_IP_address = "127.0.0.1";
         const int agent_mission_control_port = 0;
         const int agent_video_port = 0;
+        const int agent_depth_port = 0;
+        const int agent_luminance_port = 0;
+        const int agent_colourmap_port = 0;
         const int agent_observations_port = 0;
         const int agent_rewards_port = 0;
         ClientAgentConnection cac(
@@ -50,6 +57,9 @@ namespace malmo
             , agent_IP_address
             , agent_mission_control_port
             , agent_video_port
+            , agent_depth_port
+            , agent_colourmap_port
+            , agent_luminance_port
             , agent_observations_port
             , agent_rewards_port
             );
@@ -59,14 +69,17 @@ namespace malmo
             , role
             , cac
             );
+        this->mission_init->PlatformVersion(BOOST_PP_STRINGIZE(MALMO_VERSION));
     }
 
     MissionInitSpec::MissionInitSpec(const std::string& xml, bool validate)
     {
+        initialiser::initXSD();
+
         xml_schema::properties props;
         props.schema_location(xml_namespace, FindSchemaFile("MissionInit.xsd"));
 
-        xml_schema::flags flags = 0;
+        xml_schema::flags flags = xml_schema::flags::dont_initialize;
         if( !validate )
             flags = flags | xml_schema::flags::dont_validate;
 
@@ -82,7 +95,7 @@ namespace malmo
         map[""].name = xml_namespace;
         map[""].schema = "MissionInit.xsd";
         
-        xml_schema::flags flags = 0;
+        xml_schema::flags flags = xml_schema::flags::dont_initialize;
         if( !prettyPrint )
             flags = flags | xml_schema::flags::dont_pretty_print;
 
@@ -90,7 +103,12 @@ namespace malmo
         
         return oss.str();
     }
-    
+
+    std::string MissionInitSpec::getExperimentID() const
+    {
+        return this->mission_init->ExperimentUID();
+    }
+
     std::string MissionInitSpec::getClientAddress() const
     {
         return this->mission_init->ClientAgentConnection().ClientIPAddress();
@@ -146,11 +164,41 @@ namespace malmo
         return this->mission_init->ClientAgentConnection().AgentVideoPort();
     }
     
+    int MissionInitSpec::getAgentDepthPort() const
+    {
+        return this->mission_init->ClientAgentConnection().AgentDepthPort();
+    }
+
+    int MissionInitSpec::getAgentLuminancePort() const
+    {
+        return this->mission_init->ClientAgentConnection().AgentLuminancePort();
+    }
+
+    int MissionInitSpec::getAgentColourMapPort() const
+    {
+        return this->mission_init->ClientAgentConnection().AgentColourMapPort();
+    }
+
     void MissionInitSpec::setAgentVideoPort(int port)
     {
         this->mission_init->ClientAgentConnection().AgentVideoPort() = port;
     }
     
+    void MissionInitSpec::setAgentDepthPort(int port)
+    {
+        this->mission_init->ClientAgentConnection().AgentDepthPort() = port;
+    }
+
+    void MissionInitSpec::setAgentLuminancePort(int port)
+    {
+        this->mission_init->ClientAgentConnection().AgentLuminancePort() = port;
+    }
+
+    void MissionInitSpec::setAgentColourMapPort(int port)
+    {
+        this->mission_init->ClientAgentConnection().AgentColourMapPort() = port;
+    }
+
     int MissionInitSpec::getAgentObservationsPort() const
     {
         return this->mission_init->ClientAgentConnection().AgentObservationsPort();

@@ -52,6 +52,7 @@ namespace malmo
         , rewards_policy(AgentHost::RewardsPolicy::SUM_REWARDS)
         , observations_policy(AgentHost::ObservationsPolicy::LATEST_OBSERVATION_ONLY)
         , current_role( 0 )
+        , seed( 0 )
     {
         this->addOptionalFlag("help,h", "show description of allowed options");
     }
@@ -80,7 +81,8 @@ namespace malmo
         initialize(mission, mission_record, role, unique_experiment_id);
 
         this->ale_interface = boost::make_shared<ALEInterface>(role != 0);
-        this->ale_interface->setInt("random_seed", 123);
+        this->ale_interface->setInt("random_seed", this->seed);
+        this->ale_interface->setFloat("repeat_action_probability", 0); // Default is 0.25. We really don't want this!
         this->ale_interface->loadROM(unique_experiment_id);
 
         if (this->video_frame_writer)
@@ -129,9 +131,15 @@ namespace malmo
 
         WorldState old_world_state( this->world_state );
         this->world_state.clear();
+        this->world_state.has_mission_begun = this->ale_interface != 0;
         this->world_state.is_mission_running = this->ale_interface && !this->ale_interface->game_over();
 
         return old_world_state;
+    }
+
+    std::string ALEAgentHost::getRecordingTemporaryDirectory() const
+    {
+        return this->current_mission_record && this->current_mission_record->isRecording() ? this->current_mission_record->getTemporaryDirectory() : "";
     }
 
     void ALEAgentHost::setVideoPolicy(AgentHost::VideoPolicy videoPolicy)
@@ -186,34 +194,34 @@ namespace malmo
         this->world_state.number_of_video_frames_since_last_state++;
     }
     
-    void ALEAgentHost::onReward(TimestampedReward reward)
+    void ALEAgentHost::onReward(boost::posix_time::ptime ts, float reward)
     {
         boost::lock_guard<boost::mutex> scope_guard(this->world_state_mutex);
        
         if (this->reward_stream && this->reward_stream.is_open())
         {
-            this->reward_stream << boost::posix_time::to_iso_string(reward.timestamp) << " " << reward.getAsXML(false) << std::endl;
+            this->reward_stream << boost::posix_time::to_iso_string(ts) << " " << "<Reward xmlns=\"http://ProjectMalmo.microsoft.com\"><Value dimension=\"0\" value=\"" << reward << "\" /</Reward>" << std::endl;
         }
 
+        TimestampedReward tsr(reward);
         switch( this->rewards_policy )
         {
         case AgentHost::RewardsPolicy::LATEST_REWARD_ONLY:
                 this->world_state.rewards.clear();
-                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( reward ) );
+                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( tsr ) );
                 break;
         case AgentHost::RewardsPolicy::SUM_REWARDS:
                 if( !this->world_state.rewards.empty() ) {
-                    reward.add(*this->world_state.rewards.front());
+                    tsr.add(*this->world_state.rewards.front());
                     this->world_state.rewards.clear();
                 }
-                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( reward ) );
+                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( tsr ) );
                 // (timestamp is that of latest reward, even if zero)
                 break;
         case AgentHost::RewardsPolicy::KEEP_ALL_REWARDS:
-                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( reward ) );
+                this->world_state.rewards.push_back( boost::make_shared<TimestampedReward>( tsr ) );
                 break;
         }
-        
         this->world_state.number_of_rewards_since_last_state++;
     }
     
@@ -263,10 +271,7 @@ namespace malmo
         std::string timestamp = boost::posix_time::to_iso_string(ts);
         this->commands_stream << timestamp << " " << command << std::endl;
         float reward = this->ale_interface->act(a);
-        std::ostringstream reward_xml;
-        reward_xml << "<Reward xmlns=\"http://ProjectMalmo.microsoft.com\"><Value dimension=\"0\" value=\""
-                   << reward << "\" /></Reward>";
-        onReward( TimestampedReward( ts, reward_xml.str() ) );
+        onReward( ts, reward );
 
         // Get the video frame:
         const ALEScreen& screen = this->ale_interface->getScreen();

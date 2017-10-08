@@ -20,6 +20,7 @@
 // Local:
 #include "FindSchemaFile.h"
 #include "MissionSpec.h"
+#include "Init.h"
 
 // Boost:
 #include <boost/make_shared.hpp>
@@ -39,6 +40,8 @@ namespace malmo
 
     MissionSpec::MissionSpec()
     {
+        initialiser::initXSD();
+
         // construct a default mission
         About about("");
         FlatWorldGenerator flat_world_gen;
@@ -64,17 +67,19 @@ namespace malmo
 
     MissionSpec::MissionSpec(const std::string& xml, bool validate)
     {
+        initialiser::initXSD();
+
         xml_schema::properties props;
         props.schema_location(xml_namespace, FindSchemaFile("Mission.xsd"));
         
-        xml_schema::flags flags = 0;
+        xml_schema::flags flags = xml_schema::flags::dont_initialize;
         if( !validate )
             flags = flags | xml_schema::flags::dont_validate;
 
         istringstream iss(xml);
         this->mission = Mission_(iss, flags, props);
     }
-    
+
     std::string MissionSpec::getAsXML( bool prettyPrint ) const
     {
         ostringstream oss;
@@ -83,7 +88,7 @@ namespace malmo
         map[""].name = xml_namespace;
         map[""].schema = "Mission.xsd";
 
-        xml_schema::flags flags = 0;
+        xml_schema::flags flags = xml_schema::flags::dont_initialize;
         if( !prettyPrint )
             flags = flags | xml_schema::flags::dont_pretty_print;
 
@@ -93,6 +98,11 @@ namespace malmo
     }
     
     // -------------------- settings for the server ---------------------------------
+    
+    void MissionSpec::setSummary( const std::string& summary )
+    {
+        this->mission->About().Summary( summary );
+    }
 
     void MissionSpec::timeLimitInSeconds(float s)
     {
@@ -219,10 +229,18 @@ namespace malmo
     }
     
     // ------------------ settings for the agents --------------------------------
-    
+
     void MissionSpec::startAt(float x, float y, float z)
     {
         this->mission->AgentSection().front().AgentStart().Placement() = PosAndDirection(x,y,z);
+    }
+
+    void MissionSpec::startAtWithPitchAndYaw(float x, float y, float z, float pitch, float yaw)
+    {
+        PosAndDirection pos(x, y, z);
+        pos.pitch(pitch);
+        pos.yaw(yaw);
+        this->mission->AgentSection().front().AgentStart().Placement() = pos;
     }
 
     void MissionSpec::endAt(float x, float y, float z, float tolerance)
@@ -257,7 +275,25 @@ namespace malmo
         AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection().front().AgentHandlers().VideoProducer();
         vps.set( VideoProducer( width, height ) );
     }
-    
+
+    void MissionSpec::requestLuminance(int width, int height)
+    {
+        AgentHandlers::LuminanceProducer_optional& lps = this->mission->AgentSection().front().AgentHandlers().LuminanceProducer();
+        lps.set(LuminanceProducer(width, height));
+    }
+
+    void MissionSpec::requestColourMap(int width, int height)
+    {
+        AgentHandlers::ColourMapProducer_optional& cps = this->mission->AgentSection().front().AgentHandlers().ColourMapProducer();
+        cps.set(ColourMapProducer(width, height));
+    }
+
+    void MissionSpec::request32bppDepth(int width, int height)
+    {
+        AgentHandlers::DepthProducer_optional& dps = this->mission->AgentSection().front().AgentHandlers().DepthProducer();
+        dps.set(DepthProducer(width, height));
+    }
+
     void MissionSpec::requestVideoWithDepth(int width, int height)
     {
         AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection().front().AgentHandlers().VideoProducer();
@@ -357,6 +393,7 @@ namespace malmo
         this->mission->AgentSection().front().AgentHandlers().AbsoluteMovementCommands().reset();
         this->mission->AgentSection().front().AgentHandlers().InventoryCommands().reset();
         this->mission->AgentSection().front().AgentHandlers().ChatCommands().reset();
+        this->mission->AgentSection().front().AgentHandlers().MissionQuitCommands().reset();
     }
 
     void MissionSpec::allowAllContinuousMovementCommands()
@@ -435,6 +472,11 @@ namespace malmo
 
     // ------------------------------- information ---------------------------------------------------
     
+    string MissionSpec::getSummary() const
+    {
+        return this->mission->About().Summary();
+    }
+    
     int MissionSpec::getNumberOfAgents() const
     {
         return (int)this->mission->AgentSection().size();
@@ -445,28 +487,129 @@ namespace malmo
         return this->mission->AgentSection()[role].AgentHandlers().VideoProducer().present();
     }
     
+    bool MissionSpec::isDepthRequested(int role) const
+    {
+        return this->mission->AgentSection()[role].AgentHandlers().DepthProducer().present();
+    }
+
+    bool MissionSpec::isLuminanceRequested(int role) const
+    {
+        return this->mission->AgentSection()[role].AgentHandlers().LuminanceProducer().present();
+    }
+
+    bool MissionSpec::isColourMapRequested(int role) const
+    {
+        return this->mission->AgentSection()[role].AgentHandlers().ColourMapProducer().present();
+    }
+
     int MissionSpec::getVideoWidth(int role) const
     {
-        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
-        if( !vps.present() )
+        if (!isVideoRequested(role) && !isDepthRequested(role) && !isLuminanceRequested(role) && !isColourMapRequested(role))
             throw runtime_error("MissionInitSpec::getVideoWidth : video has not been requested for this role");
-        return vps->Width();
+
+        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
+        AgentHandlers::DepthProducer_optional& dps = this->mission->AgentSection()[role].AgentHandlers().DepthProducer();
+        AgentHandlers::LuminanceProducer_optional& lps = this->mission->AgentSection()[role].AgentHandlers().LuminanceProducer();
+        AgentHandlers::ColourMapProducer_optional& cps = this->mission->AgentSection()[role].AgentHandlers().ColourMapProducer();
+        return vps.present() ? vps->Width() : (dps.present() ? dps->Width() : (lps.present() ? lps->Width() : cps->Width()));
     }
-    
+
     int MissionSpec::getVideoHeight(int role) const
     {
-        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
-        if( !vps.present() )
+        if (!isVideoRequested(role) && !isDepthRequested(role) && !isLuminanceRequested(role) && !isColourMapRequested(role))
             throw runtime_error("MissionInitSpec::getVideoHeight : video has not been requested for this role");
-        return vps->Height();
+
+        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
+        AgentHandlers::DepthProducer_optional& dps = this->mission->AgentSection()[role].AgentHandlers().DepthProducer();
+        AgentHandlers::LuminanceProducer_optional& lps = this->mission->AgentSection()[role].AgentHandlers().LuminanceProducer();
+        AgentHandlers::ColourMapProducer_optional& cps = this->mission->AgentSection()[role].AgentHandlers().ColourMapProducer();
+        return vps.present() ? vps->Height() : (dps.present() ? dps->Height() : (lps.present() ? lps->Height() : cps->Height()));
     }
-    
+
     int MissionSpec::getVideoChannels(int role) const
     {
-        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
-        if( !vps.present() )
+        // Only deals with video producer; depth producer always returns 32bpp; luminance producer always returns 8bpp; colourmap producer always returns 24bpp.
+        if (!isVideoRequested(role))
             throw runtime_error("MissionInitSpec::getVideoChannels : video has not been requested for this role");
+
+        AgentHandlers::VideoProducer_optional& vps = this->mission->AgentSection()[role].AgentHandlers().VideoProducer();
         return vps->want_depth() ? 4 : 3;
+    }
+
+    vector<string> MissionSpec::getListOfCommandHandlers(int role) const
+    {
+        vector<string> command_handlers;
+        AgentHandlers ah = this->mission->AgentSection()[role].AgentHandlers();
+        if( ah.ContinuousMovementCommands().present() )
+            command_handlers.push_back( "ContinuousMovement" );
+        if( ah.AbsoluteMovementCommands().present() )
+            command_handlers.push_back( "AbsoluteMovement" );
+        if( ah.DiscreteMovementCommands().present() )
+            command_handlers.push_back( "DiscreteMovement" );
+        if( ah.InventoryCommands().present() )
+            command_handlers.push_back( "Inventory" );
+        if( ah.ChatCommands().present() )
+            command_handlers.push_back( "Chat" );
+        if( ah.SimpleCraftCommands().present() )
+            command_handlers.push_back( "SimpleCraft" );
+        if( ah.MissionQuitCommands().present() )
+            command_handlers.push_back( "MissionQuit" );
+        return command_handlers;
+    }
+    
+    vector<string> MissionSpec::getAllowedCommands(int role,const string& command_handler) const
+    {
+        AgentHandlers ah = this->mission->AgentSection()[role].AgentHandlers();
+        if( command_handler == "ContinuousMovement" && ah.ContinuousMovementCommands().present() ) {
+            vector<string> commands( begin(ContinuousMovementCommand::_xsd_ContinuousMovementCommand_literals_), end(ContinuousMovementCommand::_xsd_ContinuousMovementCommand_literals_) );
+            if( ah.ContinuousMovementCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.ContinuousMovementCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "AbsoluteMovement" && ah.AbsoluteMovementCommands().present() ) {
+            vector<string> commands( begin(AbsoluteMovementCommand::_xsd_AbsoluteMovementCommand_literals_), end(AbsoluteMovementCommand::_xsd_AbsoluteMovementCommand_literals_) );
+            if( ah.AbsoluteMovementCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.AbsoluteMovementCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "DiscreteMovement" && ah.DiscreteMovementCommands().present() ) {
+            vector<string> commands( begin(DiscreteMovementCommand::_xsd_DiscreteMovementCommand_literals_), end(DiscreteMovementCommand::_xsd_DiscreteMovementCommand_literals_) );
+            if( ah.DiscreteMovementCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.DiscreteMovementCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "Inventory" && ah.InventoryCommands().present() ) {
+            vector<string> commands( begin(InventoryCommand::_xsd_InventoryCommand_literals_), end(InventoryCommand::_xsd_InventoryCommand_literals_) );
+            if( ah.InventoryCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.InventoryCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "Chat" && ah.ChatCommands().present() ) {
+            vector<string> commands( begin(ChatCommand::_xsd_ChatCommand_literals_), end(ChatCommand::_xsd_ChatCommand_literals_) );
+            if( ah.ChatCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.ChatCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "SimpleCraft" && ah.SimpleCraftCommands().present() ) {
+            vector<string> commands( begin(SimpleCraftCommand::_xsd_SimpleCraftCommand_literals_), end(SimpleCraftCommand::_xsd_SimpleCraftCommand_literals_) );
+            if( ah.SimpleCraftCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.SimpleCraftCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        else if( command_handler == "MissionQuit" && ah.MissionQuitCommands().present() ) {
+            vector<string> commands( begin(MissionQuitCommand::_xsd_MissionQuitCommand_literals_), end(MissionQuitCommand::_xsd_MissionQuitCommand_literals_) );
+            if( ah.MissionQuitCommands()->ModifierList().present() )
+                return getModifiedCommandList( commands, *ah.MissionQuitCommands()->ModifierList() );
+            else
+                return commands;
+        }
+        throw runtime_error( "Unexpected command handler name: " + command_handler );
     }
     
     // ---------------------------- private functions -----------------------------------------------
@@ -495,6 +638,27 @@ namespace malmo
             cs.push_back( verb );
         }
         // (else silent continue - no need to alarm the user if the command is already there)
+    }
+
+    vector<string> MissionSpec::getModifiedCommandList( const vector<string>& all_commands, const CommandListModifier& modifier_list )
+    {
+        vector<string> listed_commands( modifier_list.command().begin(), modifier_list.command().end() );
+        switch( modifier_list.type() ) {
+            case type::allow_list:
+                return listed_commands;
+            case type::deny_list:
+                vector<string> full_commands( all_commands );
+                sort( full_commands.begin(), full_commands.end() );
+                sort( listed_commands.begin(), listed_commands.end() );
+                vector<string> remaining_commands;
+                std::set_difference(
+                    full_commands.begin(), full_commands.end(),
+                    listed_commands.begin(), listed_commands.end(),
+                    std::back_inserter( remaining_commands )
+                );
+                return remaining_commands;
+        }
+        throw runtime_error( "Unexpected modifier list type." );
     }
 
     std::ostream& operator<<(std::ostream& os, const MissionSpec& ms)

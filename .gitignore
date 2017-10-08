@@ -161,6 +161,7 @@ ClientBin/
 [Ss]tyle[Cc]op.*
 ~$*
 *~
+*.bak
 *.dbmdl
 *.dbproj.schemaview
 *.pfx
@@ -202,6 +203,9 @@ ModelManifest.xml
 .settings
 .project
 /Mod/eclipse
+
+# IntelliJ files
+.idea
 
 # Python
 *.pyc

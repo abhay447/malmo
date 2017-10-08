@@ -17,6 +17,8 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // --------------------------------------------------------------------------------------------------
 
+import com.microsoft.msr.malmo.*;
+
 public class test_mission
 {
     static 
@@ -27,6 +29,7 @@ public class test_mission
     public static void main(String argv[]) 
     {
         MissionSpec my_mission = new MissionSpec();
+        my_mission.setSummary("example mission");
         my_mission.timeLimitInSeconds( 10 );
         my_mission.drawBlock( 19, 0, 19, "redstone_block" );
         my_mission.createDefaultTerrain();
@@ -45,7 +48,68 @@ public class test_mission
         my_mission.observeFullInventory();
         my_mission.observeGrid(-2,0,-2,2,1,2, "Cells");
         my_mission.observeDistance(19.5f,0.0f,19.5f,"Goal");
-        my_mission.allowAllDiscreteMovementCommands();
+        my_mission.removeAllCommandHandlers();
+        my_mission.allowContinuousMovementCommand("move");
+        my_mission.allowContinuousMovementCommand("strafe");
+        my_mission.allowDiscreteMovementCommand("movenorth");
+        my_mission.allowInventoryCommand("swapInventoryItems");
+
+        if( !my_mission.getSummary().equals("example mission") ) {
+            System.out.println("Unexpected summary");
+            System.exit(1);
+        }
+
+        String[] expected_command_handlers = { "ContinuousMovement", "DiscreteMovement", "Inventory" };
+        StringVector actual_command_handlers = my_mission.getListOfCommandHandlers(0);
+        if( actual_command_handlers.size() != expected_command_handlers.length ) {
+            System.out.println("Number of command handlers mismatch");
+            System.exit(1);
+        }
+        for( int i = 0; i < actual_command_handlers.size(); i++ ) {
+            if( !actual_command_handlers.get(i).equals( expected_command_handlers[i] ) ) {
+                System.out.println("Unexpected command handler: " + actual_command_handlers.get(i) );
+                System.exit(1);
+            }
+        }
+
+        String[] expected_continuous_commands = { "move", "strafe" };
+        StringVector actual_continuous_commands = my_mission.getAllowedCommands(0,"ContinuousMovement");
+        if( actual_continuous_commands.size() != expected_continuous_commands.length ) {
+            System.out.println("Number of continuous commands mismatch");
+            System.exit(1);
+        }
+        for( int i = 0; i < actual_continuous_commands.size(); i++ ) {
+            if( !actual_continuous_commands.get(i).equals( expected_continuous_commands[i] ) ) {
+                System.out.println("Unexpected continuous command: " + actual_continuous_commands.get(i) );
+                System.exit(1);
+            }
+        }
+
+        String[] expected_discrete_commands = { "movenorth" };
+        StringVector actual_discrete_commands = my_mission.getAllowedCommands(0,"DiscreteMovement");
+        if( actual_discrete_commands.size() != expected_discrete_commands.length ) {
+            System.out.println("Number of discrete commands mismatch");
+            System.exit(1);
+        }
+        for( int i = 0; i < actual_discrete_commands.size(); i++ ) {
+            if( !actual_discrete_commands.get(i).equals( expected_discrete_commands[i] ) ) {
+               System.out.println("Unexpected discrete command: " + actual_discrete_commands.get(i) );
+                System.exit(1);
+            }
+        }
+
+        String[] expected_inventory_commands = { "swapInventoryItems" };
+        StringVector actual_inventory_commands = my_mission.getAllowedCommands(0,"Inventory");
+        if( actual_inventory_commands.size() != expected_inventory_commands.length ) {
+            System.out.println("Number of commands mismatch");
+            System.exit(1);
+        }
+        for( int i = 0; i < actual_inventory_commands.size(); i++ ) {
+            if( !actual_inventory_commands.get(i).equals( expected_inventory_commands[i] ) ) {
+                System.out.println("Unexpected command: " + actual_inventory_commands.get(i) );
+                System.exit(1);
+            }
+        }
 
         // check that the XML we produce validates
         boolean pretty_print = false;
@@ -70,7 +134,7 @@ public class test_mission
         }
         
         // check that known-good XML validates
-        String xml3 = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><Mission xmlns=\"http://ProjectMalmo.microsoft.com\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://ProjectMalmo.microsoft.com Mission.xsd\">"
+        String xml3 = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><Mission xmlns=\"http://ProjectMalmo.microsoft.com\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
             +"<About><Summary>Run the maze!</Summary></About>"
             +"<ServerSection><ServerInitialConditions><AllowSpawning>true</AllowSpawning><Time><StartTime>1000</StartTime><AllowPassageOfTime>true</AllowPassageOfTime></Time><Weather>clear</Weather></ServerInitialConditions>"
             +"<ServerHandlers>"
@@ -81,13 +145,44 @@ public class test_mission
             +"<AgentSection><Name>Jason Bourne</Name><AgentStart><Placement x=\"-204\" y=\"81\" z=\"217\"/></AgentStart><AgentHandlers>"
             +"<VideoProducer want_depth=\"true\"><Width>320</Width><Height>240</Height></VideoProducer>"
             +"<RewardForReachingPosition><Marker reward=\"100\" tolerance=\"1.1\" x=\"-104\" y=\"81\" z=\"217\"/></RewardForReachingPosition>"
-            +"<ContinuousMovementCommands />"
+            +"<ContinuousMovementCommands><ModifierList type=\"deny-list\"><command>attack</command><command>crouch</command></ModifierList></ContinuousMovementCommands>"
             +"<AgentQuitFromReachingPosition><Marker x=\"-104\" y=\"81\" z=\"217\"/></AgentQuitFromReachingPosition>"
             +"</AgentHandlers></AgentSection></Mission>";
         try 
         {
             boolean validate = true;
             MissionSpec my_mission3 = new MissionSpec( xml3, validate );
+            
+            if( !my_mission3.getSummary().equals("Run the maze!") ) {
+                System.out.println("Unexpected summary");
+                System.exit(1);
+            }
+
+            String[] expected_command_handlers2 = { "ContinuousMovement" };
+            StringVector actual_command_handlers2 = my_mission3.getListOfCommandHandlers(0);
+            if( actual_command_handlers2.size() != expected_command_handlers2.length ) {
+                System.out.println("Number of command handlers mismatch");
+                System.exit(1);
+            }
+            for( int i = 0; i < actual_command_handlers2.size(); i++ ) {
+                if( !actual_command_handlers2.get(i).equals( expected_command_handlers2[i] ) ) {
+                    System.out.println("Unexpected command handler: " + actual_command_handlers2.get(i) );
+                    System.exit(1);
+                }
+            }
+
+            String[] expected_continuous_commands2 = { "jump", "move", "pitch", "strafe", "turn", "use" };
+            StringVector actual_continuous_commands2 = my_mission3.getAllowedCommands(0,"ContinuousMovement");
+            if( actual_continuous_commands2.size() != expected_continuous_commands2.length ) {
+                System.out.println("Number of continuous commands mismatch");
+                System.exit(1);
+            }
+            for( int i = 0; i < actual_continuous_commands2.size(); i++ ) {
+                if( !actual_continuous_commands2.get(i).equals( expected_continuous_commands2[i] ) ) {
+                    System.out.println("Unexpected continuous command: " + actual_continuous_commands2.get(i) );
+                    System.exit(1);
+                }
+            }
         } 
         catch( Exception e )
         {

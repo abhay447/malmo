@@ -1,3 +1,4 @@
+from __future__ import print_function
 # ------------------------------------------------------------------------------------------------
 # Copyright (c) 2016 Microsoft Corporation
 # 
@@ -25,6 +26,7 @@
 # These outcomes will give a reward of 100, -800 and 400 respectively (specified in RewardForMissionEnd)
 # There is also a reward of -900 for running out of time (see ServerQuitFromTimeUp), and -1000 for dying.
 
+from builtins import range
 import MalmoPython
 import os
 import random
@@ -107,7 +109,11 @@ def SetVelocity(vel):
 def SetTurn(turn):
     agent_host.sendCommand( "turn " + str(turn) )
 
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+if sys.version_info[0] == 2:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+else:
+    import functools
+    print = functools.partial(print, flush=True)
 
 recordingsDirectory="MissionEndRecordings"
 try:
@@ -122,11 +128,11 @@ agent_host = MalmoPython.AgentHost()
 try:
     agent_host.parse( sys.argv )
 except RuntimeError as e:
-    print 'ERROR:',e
-    print agent_host.getUsage()
+    print('ERROR:',e)
+    print(agent_host.getUsage())
     exit(1)
 if agent_host.receivedArgument("help"):
-    print agent_host.getUsage()
+    print(agent_host.getUsage())
     exit(0)
 
 # Create a pool of Minecraft Mod clients.
@@ -145,7 +151,7 @@ else:
     num_reps = 30000
 
 for iRepeat in range(num_reps):
-    # Set up a recording - MUST be done once for each mission - don't do this outside the loop!
+    # Set up a recording
     my_mission_record = MalmoPython.MissionRecordSpec(recordingsDirectory + "//" + "Mission_" + str(iRepeat) + ".tgz")
     my_mission_record.recordRewards()
     my_mission_record.recordMP4(24,400000)
@@ -157,14 +163,14 @@ for iRepeat in range(num_reps):
             break
         except RuntimeError as e:
             if retry == max_retries - 1:
-                print "Error starting mission",e
-                print "Is the game running?"
+                print("Error starting mission",e)
+                print("Is the game running?")
                 exit(1)
             else:
                 time.sleep(2)
 
     world_state = agent_host.getWorldState()
-    while not world_state.is_mission_running:
+    while not world_state.has_mission_begun:
         time.sleep(0.1)
         world_state = agent_host.getWorldState()
 
@@ -180,7 +186,7 @@ for iRepeat in range(num_reps):
             # A reward signal has come in - see what it is:
             delta = world_state.rewards[0].getValue()
             if delta != 0:
-                print "New reward: " + str(delta)
+                print("New reward: " + str(delta))
                 reward += delta
 
         if turncount > 0:
@@ -193,5 +199,5 @@ for iRepeat in range(num_reps):
         time.sleep(0.1)
         
     # mission has ended.
-    print "Mission " + str(iRepeat+1) + ": Reward = " + str(reward)
+    print("Mission " + str(iRepeat+1) + ": Reward = " + str(reward))
     time.sleep(0.5) # Give the mod a little time to prepare for the next mission.

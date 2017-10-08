@@ -6,7 +6,7 @@
            xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
            elementFormDefault="qualified"
            jaxb:version="2.1"
-           version="0.14">
+           version="0.31">
 
     <xs:include schemaLocation="Types.xsd" /> 
     <xs:include schemaLocation="MissionHandlers.xsd" /> 
@@ -129,8 +129,14 @@
                 <xs:element name="Inventory" minOccurs="0" maxOccurs="1" >
                     <xs:complexType>
                         <xs:choice minOccurs="0" maxOccurs="unbounded" >    <!-- minOccurs = 0 to allow an empty Inventory -->
-                            <xs:element ref="InventoryItem" />
-                            <xs:element ref="InventoryBlock" />
+                            <xs:element ref="InventoryObject" />
+                        </xs:choice>
+                    </xs:complexType>
+                </xs:element>
+                <xs:element name="EnderBoxInventory" minOccurs="0" maxOccurs="1" >
+                    <xs:complexType>
+                        <xs:choice minOccurs="0" maxOccurs="unbounded" >    <!-- minOccurs = 0 to allow an empty Inventory -->
+                            <xs:element ref="InventoryObject" />
                         </xs:choice>
                     </xs:complexType>
                 </xs:element>
@@ -154,6 +160,16 @@
                       Set this to true to allow mobs (animals and hostiles) to spawn during a mission.
                     </xs:documentation>
                   </xs:annotation>
+                </xs:element>
+                <xs:element name="AllowedMobs" minOccurs="0" maxOccurs="1">
+                  <xs:annotation>
+                    <xs:documentation>
+                      If AllowSpawning is set to true, use this to specify a list of the allowed mobs. Only those mobs which are on the list will be allowed to spawn. If no list is specified, normal spawning behaviour will take place. Note that these settings *do* effect mob_spawner blocks.
+                    </xs:documentation>
+                  </xs:annotation>
+                    <xs:simpleType>
+                        <xs:list itemType="EntityTypes"/>
+                    </xs:simpleType>
                 </xs:element>
             </xs:all>
         </xs:complexType>
@@ -195,7 +211,7 @@
       </xs:annotation>
       <xs:simpleType>
         <xs:restriction base="xs:int">
-          <xs:minInclusive value="1" />
+          <xs:minInclusive value="0" />
           <xs:maxInclusive value="23999" />
         </xs:restriction>
       </xs:simpleType>
@@ -225,58 +241,59 @@
         </xs:simpleType>
     </xs:element>
 
-    <xs:element name="InventoryItem">
+    <xs:complexType name="InventoryObjectType">
+        <xs:attribute name="slot" use="required">
+            <xs:simpleType>
+                <xs:restriction base="xs:int">
+                    <xs:minInclusive value="0"/>
+                    <xs:maxInclusive value="39"/>
+                </xs:restriction>    
+            </xs:simpleType>
+        </xs:attribute>
+        <xs:attribute name="type" use="required" type="BlockOrItem"/>
+        <xs:attribute name="variant" use="optional" type="Variation" />
+        <xs:attribute name="colour" use="optional" type="Colour" />
+        <xs:attribute name="quantity" default="1">
+            <xs:simpleType>
+                <xs:restriction base="xs:int">
+                    <xs:minInclusive value="1"/>
+                    <xs:maxInclusive value="64"/>
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:attribute>
+    </xs:complexType>
+
+    <xs:element name="InventoryObject" type="InventoryObjectType">
         <xs:annotation>
             <xs:documentation>
-              Defines an item in the inventory.
+              Defines an item or block in the inventory.
             </xs:documentation>
         </xs:annotation>
-        <xs:complexType>
-            <xs:attribute name="slot" use="required">
-                <xs:simpleType>
-                    <xs:restriction base="xs:int">
-                        <xs:minInclusive value="0"/>
-                        <xs:maxInclusive value="39"/>
-                    </xs:restriction>    
-                </xs:simpleType>
-            </xs:attribute>
-            <xs:attribute name="type" use="required" type="ItemType"/>
-            <xs:attribute name="quantity" default="1">
-                <xs:simpleType>
-                    <xs:restriction base="xs:int">
-                        <xs:minInclusive value="1"/>
-                        <xs:maxInclusive value="64"/>
-                    </xs:restriction>
-                </xs:simpleType>
-            </xs:attribute>
-        </xs:complexType>
     </xs:element>
 
-    <xs:element name="InventoryBlock">
+    <xs:element name="InventoryItem" substitutionGroup="InventoryObject">
         <xs:annotation>
             <xs:documentation>
-              Defines a block in the inventory.
+              Defines an item in the inventory - deprecated, use InventoryObject instead
             </xs:documentation>
         </xs:annotation>
         <xs:complexType>
-            <xs:attribute name="slot" use="required">
-                <xs:simpleType>
-                    <xs:restriction base="xs:int">
-                        <xs:minInclusive value="0"/>
-                        <xs:maxInclusive value="39"/>
-                    </xs:restriction>    
-                </xs:simpleType>
-            </xs:attribute>
-            <xs:attribute name="type" use="required" type="BlockType"/>
-            <xs:attribute name="variant" use="optional" type="BlockVariant" />
-            <xs:attribute name="quantity" default="1">
-                <xs:simpleType>
-                    <xs:restriction base="xs:int">
-                        <xs:minInclusive value="1"/>
-                        <xs:maxInclusive value="64"/>
-                    </xs:restriction>
-                </xs:simpleType>
-            </xs:attribute>
+            <xs:complexContent>
+                <xs:extension base="InventoryObjectType"/>
+            </xs:complexContent>
+        </xs:complexType>
+    </xs:element>
+    
+    <xs:element name="InventoryBlock" substitutionGroup="InventoryObject">
+        <xs:annotation>
+            <xs:documentation>
+              Defines a block in the inventory - deprecated, use InventoryObject instead
+            </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:complexContent>
+                <xs:extension base="InventoryObjectType"/>
+            </xs:complexContent>
         </xs:complexType>
     </xs:element>
 
@@ -320,15 +337,26 @@
             <xs:element ref="ObservationFromDistance" minOccurs="0"/>
             <xs:element ref="ObservationFromDiscreteCell" minOccurs="0"/>
             <xs:element ref="ObservationFromChat" minOccurs="0"/>
-            
+            <xs:element ref="ObservationFromNearbyEntities" minOccurs="0"/>
+            <xs:element ref="ObservationFromRay" minOccurs="0"/>
+            <xs:element ref="ObservationFromTurnScheduler" minOccurs="0"/>
+
             <xs:element ref="VideoProducer" minOccurs="0"/>
+            <xs:element ref="DepthProducer" minOccurs="0"/>
+            <xs:element ref="LuminanceProducer" minOccurs="0"/>
+            <xs:element ref="ColourMapProducer" minOccurs="0"/>
 
             <xs:element ref="RewardForTouchingBlockType" minOccurs="0" />
             <xs:element ref="RewardForSendingCommand" minOccurs="0" />
+            <xs:element ref="RewardForSendingMatchingChatMessage" minOccurs="0" />
             <xs:element ref="RewardForCollectingItem" minOccurs="0" />
             <xs:element ref="RewardForDiscardingItem" minOccurs="0" />
             <xs:element ref="RewardForReachingPosition" minOccurs="0"/>
             <xs:element ref="RewardForMissionEnd" minOccurs="0"/>
+            <xs:element ref="RewardForStructureCopying" minOccurs="0"/>
+            <xs:element ref="RewardForTimeTaken" minOccurs="0"/>
+            <xs:element ref="RewardForCatchingMob" minOccurs="0"/>
+            <xs:element ref="RewardForDamagingEntity" minOccurs="0"/>
 
             <xs:element ref="ContinuousMovementCommands" minOccurs="0"/>
             <xs:element ref="AbsoluteMovementCommands" minOccurs="0"/>
@@ -336,11 +364,35 @@
             <xs:element ref="InventoryCommands" minOccurs="0"/>
             <xs:element ref="ChatCommands" minOccurs="0"/>
             <xs:element ref="SimpleCraftCommands" minOccurs="0"/>
+            <xs:element ref="MissionQuitCommands" minOccurs="0"/>
+            <xs:element ref="TurnBasedCommands" minOccurs="0"/>
+            <!-- When adding a new command handler, make sure to update MissionSpec::getListOfCommandHandlers and MissionSpec::getAllowedCommands, and add to TurnBasedApplicableCommandHandlers (below) if appropriate --> 
 
             <xs:element ref="AgentQuitFromTimeUp" minOccurs="0" />
             <xs:element ref="AgentQuitFromReachingPosition" minOccurs="0" />
             <xs:element ref="AgentQuitFromTouchingBlockType" minOccurs="0" />
+            <xs:element ref="AgentQuitFromCollectingItem" minOccurs="0" />
             <xs:element ref="AgentQuitFromReachingCommandQuota" minOccurs="0" />
+            <xs:element ref="AgentQuitFromCatchingMob" minOccurs="0" />
+        </xs:all>
+    </xs:group>
+
+    <xs:group name="TurnBasedApplicableCommandHandlers">
+        <xs:annotation>
+            <xs:documentation>
+              Lists the command handlers which are applicable to a turn-based scenario.
+            </xs:documentation>
+            <xs:appinfo>
+                <jaxb:property name="TurnBasedApplicableCommandHandlers"/>
+            </xs:appinfo>
+        </xs:annotation>
+        <xs:all>
+            <xs:element ref="AbsoluteMovementCommands" minOccurs="0"/>
+            <xs:element ref="DiscreteMovementCommands" minOccurs="0"/>
+            <xs:element ref="InventoryCommands" minOccurs="0"/>
+            <xs:element ref="ChatCommands" minOccurs="0"/>
+            <xs:element ref="SimpleCraftCommands" minOccurs="0"/>
+            <xs:element ref="MissionQuitCommands" minOccurs="0"/>
         </xs:all>
     </xs:group>
     
@@ -380,9 +432,12 @@
                         </xs:appinfo>
                     </xs:annotation>
                     <xs:element ref="DrawingDecorator" />
+                    <xs:element ref="AnimationDecorator" />
                     <xs:element ref="MazeDecorator"  />
                     <xs:element ref="ClassroomDecorator" />
                     <xs:element ref="SnakeDecorator"  />
+                    <xs:element ref="MovingTargetDecorator" />
+                    <xs:element ref="BuildBattleDecorator" />
                 </xs:choice>
                 <xs:choice minOccurs="0" maxOccurs="unbounded">
                     <xs:annotation>

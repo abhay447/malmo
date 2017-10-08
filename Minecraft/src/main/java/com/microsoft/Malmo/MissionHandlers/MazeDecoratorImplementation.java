@@ -21,33 +21,32 @@ package com.microsoft.Malmo.MissionHandlers;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Hashtable;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
-import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.BlockPos;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-import com.microsoft.Malmo.MalmoMod;
 import com.microsoft.Malmo.MissionHandlerInterfaces.IWorldDecorator;
-import com.microsoft.Malmo.Schemas.AgentHandlers;
 import com.microsoft.Malmo.Schemas.AgentQuitFromReachingPosition;
 import com.microsoft.Malmo.Schemas.AgentSection;
+import com.microsoft.Malmo.Schemas.BlockOrItemSpec;
 import com.microsoft.Malmo.Schemas.BlockType;
-import com.microsoft.Malmo.Schemas.BlockVariant;
 import com.microsoft.Malmo.Schemas.Colour;
-import com.microsoft.Malmo.Schemas.ItemType;
+import com.microsoft.Malmo.Schemas.DrawItem;
 import com.microsoft.Malmo.Schemas.MazeBlock;
 import com.microsoft.Malmo.Schemas.MazeDecorator;
 import com.microsoft.Malmo.Schemas.MissionInit;
 import com.microsoft.Malmo.Schemas.ObservationFromSubgoalPositionList;
 import com.microsoft.Malmo.Schemas.PointWithToleranceAndDescription;
 import com.microsoft.Malmo.Schemas.PosAndDirection;
+import com.microsoft.Malmo.Schemas.Variation;
 import com.microsoft.Malmo.Utils.BlockDrawingHelper;
+import com.microsoft.Malmo.Utils.BlockDrawingHelper.XMLBlockState;
 import com.microsoft.Malmo.Utils.MinecraftTypeHelper;
 
 public class MazeDecoratorImplementation extends HandlerBase implements IWorldDecorator
@@ -57,17 +56,16 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
     // Random number generators for path generation / block choosing:
     private Random pathrand;
     private Random blockrand;
-    
-    // Block types and heights:
-    private IBlockState startBlock;
-    private IBlockState endBlock;
-    private IBlockState floorBlock;
-    private IBlockState pathBlock;
-    private IBlockState optimalPathBlock;
-    private IBlockState subgoalPathBlock;
-    private IBlockState gapBlock;
-    private IBlockState waypointBlock;
-    private Item waypointItem;
+
+    private XMLBlockState startBlock;
+    private XMLBlockState endBlock;
+    private XMLBlockState floorBlock;
+    private XMLBlockState pathBlock;
+    private XMLBlockState optimalPathBlock;
+    private XMLBlockState subgoalPathBlock;
+    private XMLBlockState gapBlock;
+    private XMLBlockState waypointBlock;
+    private ItemStack waypointItem;
 
     private int startHeight;
     private int endHeight;
@@ -75,6 +73,7 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
     private int optimalPathHeight;
     private int subgoalHeight;
     private int gapHeight;
+    private PosAndDirection startPosition = null;
     private AgentQuitFromReachingPosition quitter = null;
     private ObservationFromSubgoalPositionList navigator = null;
 
@@ -160,9 +159,14 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
                 this.waypointBlock = getBlock(this.mazeParams.getWaypoints().getWaypointBlock(), this.blockrand);
             else
             {
-                List<ItemType> items = this.mazeParams.getWaypoints().getWaypointItem();
-                String item = items.get(this.blockrand.nextInt(items.size())).value();
-                this.waypointItem = MinecraftTypeHelper.ParseItemType(item);
+                BlockOrItemSpec bis = this.mazeParams.getWaypoints().getWaypointItem();
+                DrawItem di = new DrawItem();
+                di.setType(bis.getType().get(this.blockrand.nextInt(bis.getType().size())));
+                if (bis.getColour() != null && !bis.getColour().isEmpty())
+                    di.setColour(bis.getColour().get(this.blockrand.nextInt(bis.getColour().size())));
+                if (bis.getVariant() != null && !bis.getVariant().isEmpty())
+                    di.setVariant(bis.getVariant().get(this.blockrand.nextInt(bis.getVariant().size())));
+                this.waypointItem = MinecraftTypeHelper.getItemStackFromDrawItem(di);
             }
         }
         
@@ -491,7 +495,7 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
                     int cellindex = cellx + cellz * width;
                     if (cellindex < 0 || cellindex >= grid.length || grid[cellindex] == null)
                         walkable = false;
-                    if (walkable && gapHeight > optimalPathHeight && !gapBlock.equals(Blocks.air.getDefaultState()))
+                    if (walkable && gapHeight > optimalPathHeight && !gapBlock.equals(Blocks.AIR.getDefaultState()))
                     {
                         // The "gaps" are in fact walls, so we need to be a bit more conservative with our path, since the
                         // player has a width of 0.4 cells. We do this in a very unsophisticated, brute-force manor by testing
@@ -557,9 +561,12 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
 
     private void placeBlocks(World world, Cell[] grid, Cell start, Cell end)
     {
+        BlockDrawingHelper drawContext = new BlockDrawingHelper();
+        drawContext.beginDrawing(world);
+
         int scale = this.mazeParams.getSizeAndPosition().getScale();
         // First remove any entities lying around in our area:
-        BlockDrawingHelper.clearEntities(world, this.xOrg, this.yOrg, this.zOrg, this.xOrg + this.width * scale, this.yOrg + this.mazeParams.getSizeAndPosition().getHeight(), this.zOrg + this.length * scale);
+        drawContext.clearEntities(world, this.xOrg, this.yOrg, this.zOrg, this.xOrg + this.width * scale, this.yOrg + this.mazeParams.getSizeAndPosition().getHeight(), this.zOrg + this.length * scale);
         
         // Clear a volume of air, lay a carpet, and put the random pavement over it:
         for (int x = 0; x < this.width * scale; x++)
@@ -570,9 +577,10 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
                 {
                     world.setBlockToAir(new BlockPos(x + this.xOrg, y + this.yOrg, z + this.zOrg));
                 }
-                world.setBlockState(new BlockPos(x + this.xOrg, this.yOrg, z + this.zOrg), this.floorBlock);
+                BlockPos bp = new BlockPos(x + this.xOrg, this.yOrg, z + this.zOrg);
+                drawContext.setBlockState(world, bp, this.floorBlock);
                 Cell c = grid[(x/scale) + ((z/scale) * this.width)];
-                IBlockState bs = (c == null) ? this.gapBlock : (c.isOnOptimalPath ? this.optimalPathBlock : this.pathBlock);
+                XMLBlockState bs = (c == null) ? this.gapBlock : (c.isOnOptimalPath ? this.optimalPathBlock : this.pathBlock);
                 int h = (c == null) ? this.gapHeight : (c.isOnOptimalPath ? this.optimalPathHeight : this.pathHeight);
                 if (c != null && c.isSubgoal)
                 {
@@ -586,11 +594,11 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
                         bs = this.waypointBlock;
                         h = this.pathHeight;
                     }
-                    else
+                    else if (this.waypointItem != null)
                     {
                         // Place a waypoint item here:
                         int offset = 0;//(scale % 2 == 0) ? 1 : 0;
-                        BlockDrawingHelper.placeItem(this.waypointItem, new BlockPos(x + this.xOrg + offset, this.yOrg + h + 1, z + this.zOrg + offset), world, (scale % 2 == 1));
+                        drawContext.placeItem(this.waypointItem.copy(), new BlockPos(x + this.xOrg + offset, this.yOrg + h + 1, z + this.zOrg + offset), world, (scale % 2 == 1));
                     }
                 }
                 if (c != null && c == start)
@@ -605,8 +613,10 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
                 }
 
                 for (int y = 1; y <= h; y++)
-                    world.setBlockState(new BlockPos(x + this.xOrg, y + this.yOrg, z + this.zOrg), bs);
-                //world.setBlockState(new BlockPos(x + this.xOrg, this.yOrg + this.mazeParams.getSizeAndPosition().getHeight(), z + this.zOrg), this.gapBlock);
+                {
+                    BlockPos pos = new BlockPos(x + this.xOrg, y + this.yOrg, z + this.zOrg);
+                    drawContext.setBlockState(world, pos, bs);
+                }
             }
         }
     }
@@ -621,6 +631,7 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
         p.setX(new BigDecimal(scale * (start.x + 0.5) + this.xOrg));
         p.setY(new BigDecimal(1 + this.yOrg + this.startHeight));
         p.setZ(new BigDecimal(scale * (start.z + 0.5) + this.zOrg));
+        this.startPosition = p;
         // TODO - for the moment, force all players to being at the maze start point - but this needs to be optional.
         for (AgentSection as : missionInit.getMission().getAgentSection())
         {
@@ -648,7 +659,7 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
     }
 
     @Override
-    public void buildOnWorld(MissionInit missionInit)
+    public void buildOnWorld(MissionInit missionInit, World world)
     {
         // Set up various parameters according to the XML specs:
         initRNGs();
@@ -685,7 +696,6 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
         findSubgoals(grid, start, end);
 
         // Now build the actual Minecraft world:
-        World world = MinecraftServer.getServer().getEntityWorld();
         placeBlocks(world, grid, start, end);
 
         // Finally, write the start and goal points into the MissionInit data structure for the other MissionHandlers to use:
@@ -704,19 +714,19 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
         return h;
     }
     
-    private IBlockState getBlock(MazeBlock mblock, Random rand)
+    private XMLBlockState getBlock(MazeBlock mblock, Random rand)
     {
-        String blockName = chooseBlock(mblock.getType(), rand);
+        BlockType blockName = chooseBlock(mblock.getType(), rand);
         Colour blockCol = chooseColour(mblock.getColour(), rand);
-        BlockVariant blockVar = chooseVariant(mblock.getVariant(), rand);
-        return BlockDrawingHelper.applyModifications(MinecraftTypeHelper.ParseBlockType(blockName), blockCol, null, blockVar);
+        Variation blockVar = chooseVariant(mblock.getVariant(), rand);
+        return new XMLBlockState(blockName, blockCol, null, blockVar);
     }
 
-    private String chooseBlock(List<BlockType> types, Random r)
+    private BlockType chooseBlock(List<BlockType> types, Random r)
     {
         if (types == null || types.size() == 0)
-            return "air";
-        return types.get(r.nextInt(types.size())).value();
+            return BlockType.AIR;
+        return types.get(r.nextInt(types.size()));
     }
 
     private Colour chooseColour(List<Colour> colours, Random r)
@@ -726,7 +736,7 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
         return colours.get(r.nextInt(colours.size()));
     }
     
-    private BlockVariant chooseVariant(List<BlockVariant> vars, Random r)
+    private Variation chooseVariant(List<Variation> vars, Random r)
     {
         if (vars == null || vars.size() == 0)
             return null;
@@ -761,19 +771,49 @@ public class MazeDecoratorImplementation extends HandlerBase implements IWorldDe
     public void update(World world) {}
 
     @Override
-    public boolean getExtraAgentHandlers(AgentHandlers handlers)
+    public boolean getExtraAgentHandlersAndData(List<Object> handlers, Map<String, String> data)
     {
         boolean added = false;
         if (this.quitter != null)
         {
-            handlers.getAgentMissionHandlers().add(this.quitter);
+            handlers.add(this.quitter);
             added = true;
         }
         if (this.navigator != null)
         {
-            handlers.getAgentMissionHandlers().add(this.navigator);
+            handlers.add(this.navigator);
             added = true;
         }
+
+        // Also add our new start data:
+        Float x = this.startPosition.getX().floatValue();
+        Float y = this.startPosition.getY().floatValue();
+        Float z = this.startPosition.getZ().floatValue();
+        String posString = x.toString() + ":" + y.toString() + ":" + z.toString();
+        data.put("startPosition", posString);
+
         return added;
+    }
+
+    @Override
+    public void prepare(MissionInit missionInit)
+    {
+    }
+
+    @Override
+    public void cleanup()
+    {
+    }
+
+    @Override
+    public boolean targetedUpdate(String nextAgentName)
+    {
+        return false;   // Does nothing.
+    }
+
+    @Override
+    public void getTurnParticipants(ArrayList<String> participants, ArrayList<Integer> participantSlots)
+    {
+        // Does nothing.
     }
 }

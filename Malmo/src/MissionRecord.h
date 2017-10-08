@@ -80,6 +80,18 @@ namespace malmo
             //! \returns The path as a string.
             std::string getMP4Path() const;
 
+            //! Gets the path where the mp4 depth video should be saved to, if recording has been requested.
+            //! \returns The path as a string.
+            std::string getMP4DepthPath() const;
+
+            //! Gets the path where the mp4 luminance video should be saved to, if recording has been requested.
+            //! \returns The path as a string.
+            std::string getMP4LuminancePath() const;
+
+            //! Gets the path where the mp4 colourmap video should be saved to, if recording has been requested.
+            //! \returns The path as a string.
+            std::string getMP4ColourMapPath() const;
+
             //! Gets the bitrate at which the video should be recorded, if MP4 recording has been requested.
             //! \returns The bitrate in bits per second.
             int64_t getMP4BitRate() const;
@@ -104,10 +116,24 @@ namespace malmo
             //! \returns The path as a string
             std::string getMissionInitPath() const;
 
-        private:
+            //! Gets the temporary directory for this mission record.
+            //! \returns The temporary directory for the mission record.
+            std::string getTemporaryDirectory() const;
 
-            bool is_closed;
+        private:
             MissionRecordSpec spec;
+            bool is_closed;
+
+            std::string mp4_path;
+            std::string mp4_depth_path;
+            std::string mp4_luminance_path;
+            std::string mp4_colourmap_path;
+            std::string observations_path;
+            std::string rewards_path;
+            std::string commands_path;
+            std::string mission_init_path;
+            std::string mission_id;
+            boost::filesystem::path temp_dir;
 
             void addFiles(std::vector<boost::filesystem::path> &fileList, boost::filesystem::path directory);
             void addFile(lindenb::io::Tar& archive, boost::filesystem::path path);

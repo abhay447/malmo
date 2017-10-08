@@ -1,3 +1,4 @@
+from __future__ import print_function
 # ------------------------------------------------------------------------------------------------
 # Copyright (c) 2016 Microsoft Corporation
 # 
@@ -18,9 +19,13 @@
 # ------------------------------------------------------------------------------------------------
 
 # Sample to demonstrate use of basic crafting.
-# 4 bowls = 3 Oak Wood Planks
-# 1 item.rabbitStew = 1 x item.rabbitCooked(Cooked Rabbit), 1 x item.carrots(Carrot), 1 x item.potatoBaked(Baked Potato), 1 x tile.mushroom(Mushroom), 1 x item.bowl(Bowl)
+# The goal of the mission is to make the rabbit stew. This requires four craft commands:
+# 1 cooked_rabbit = 1 rabbit + fuel
+# 1 baked_potato = 1 potato + fuel
+# 4 bowls = 3 planks
+# 1 rabbit_stew = 1 x cooked_rabbit + 1 x carrot + 1 x baked_potato + 1 x brown_mushroom + 1 x bowl
 
+from builtins import range
 import MalmoPython
 import os
 import random
@@ -30,7 +35,7 @@ import json
 import random
 import errno
 
-items=["cooked_rabbit", "carrot", "baked_potato"]
+items=["red_flower white_tulip", "coal", "planks spruce", "planks birch", "planks dark_oak", "rabbit", "carrot", "potato", "brown_mushroom"]
 
 def buildPositionList(items):
     positions=[]
@@ -42,7 +47,11 @@ def getItemDrawing(positions):
     drawing=""
     index=0
     for p in positions:
-        drawing += '<DrawItem x="' + str(p[0]) + '" y="228" z="' + str(p[1]) + '" type="' + items[index] + '" />'
+        item = items[index].split()
+        drawing += '<DrawItem x="' + str(p[0]) + '" y="228" z="' + str(p[1]) + '" type="' + item[0]
+        if len(item) > 1:
+            drawing += '" variant="' + item[1]
+        drawing += '" />'
         index += 1
     return drawing
 
@@ -52,29 +61,67 @@ def getSubgoalPositions(positions):
         goals += '<Point x="' + str(p[0]) + '" y="227" z="' + str(p[1]) + '" tolerance="1" description="ingredient" />'
     return goals
 
+def printInventory(obs):
+    for i in range(0,9):
+        key = 'InventorySlot_'+str(i)+'_item'
+        var_key = 'InventorySlot_'+str(i)+'_variant'
+        col_key = 'InventorySlot_'+str(i)+'_colour'
+        if key in obs:
+            item = obs[key]
+            print(str(i) + " ------ " + item, end=' ')
+        else:
+            print(str(i) + " -- ", end=' ')
+        if var_key in obs:
+            print(obs[var_key], end=' ')
+        if col_key in obs:
+            print(obs[col_key], end=' ')
+        print()
+
 def checkInventoryForBowlIngredients(obs):
     # Need three planks
     plank_count = 0
-    for i in xrange(0,10):
+    for i in range(0,39):
         key = 'InventorySlot_'+str(i)+'_item'
         if key in obs:
             item = obs[key]
-            if item == 'tile.wood':
+            if item == 'planks':
                 plank_count += int(obs[u'InventorySlot_'+str(i)+'_size'])
-            if item == 'item.bowl':
+            if item == 'bowl':
                 return False    # Already have a bowl, so don't want another one!
     return plank_count >= 3
 
+def checkInventoryForItem(obs, requested):
+    for i in range(0,39):
+        key = 'InventorySlot_'+str(i)+'_item'
+        if key in obs:
+            item = obs[key]
+            if item == requested:
+                return True
+    return False
+
+def checkFuelPosition(obs, agent_host):
+    '''Make sure our coal, if we have any, is in slot 0.'''
+    # (We need to do this because the furnace crafting commands - cooking the potato and the rabbit -
+    # take the first available item of fuel in the inventory. If this isn't the coal, it could end up burning the wood
+    # that we need for making the bowl.)
+    for i in range(1,39):
+        key = 'InventorySlot_'+str(i)+'_item'
+        if key in obs:
+            item = obs[key]
+            if item == 'coal':
+                agent_host.sendCommand("swapInventoryItems 0 " + str(i))
+                return
+
 def checkInventoryForStewIngredients(obs):
     # Need a bowl, a cooked rabbit, a carrot, a mushroom and a baked potato.
-    required=["item.rabbitCooked", "item.potatoBaked", "item.bowl", "item.carrots", "tile.mushroom"]
-    for i in xrange(0,10):
+    required=["cooked_rabbit", "baked_potato", "bowl", "carrot", "brown_mushroom"]
+    for i in range(0,39):
         key = 'InventorySlot_'+str(i)+'_item'
         if key in obs:
             item = obs[key]
             if item in required:
                 required.remove(item)
-            if item == 'item.rabbitStew':
+            if item == 'rabbit_stew':
                 return False    # Already have the stew.
     return len(required) == 0
     
@@ -93,7 +140,10 @@ def GetMissionXML(summary):
             <ServerHandlers>
                 <FlatWorldGenerator generatorString="3;7,220*1,5*3,2;3;,biome_1" />
                 <DrawingDecorator>
-                    <DrawCuboid x1="-50" y1="226" z1="-50" x2="50" y2="226" z2="50" type="carpet" colour="RED" face="UP"/>
+                    <DrawCuboid x1="-50" y1="227" z1="-50" x2="50" y2="227" z2="50" type="air" />   <!-- to clear old items-->
+                    <DrawCuboid x1="-50" y1="226" z1="-50" x2="50" y2="226" z2="50" type="monster_egg" variant="chiseled_brick" />
+                    <DrawCuboid x1="-3" y1="226" z1="-3" x2="3" y2="226" z2="3" type="dirt" />
+                    <DrawCuboid x1="-3" y1="227" z1="-3" x2="3" y2="227" z2="3" type="red_flower" variant="blue_orchid" /> <!-- yes, blue orchids are indeed a type of red flower. -->
                     ''' + getItemDrawing(positions) + '''
                 </DrawingDecorator>
                 <ServerQuitFromTimeUp timeLimitMs="150000"/>
@@ -102,34 +152,57 @@ def GetMissionXML(summary):
         </ServerSection>
 
         <AgentSection mode="Survival">
-            <Name>The Hungry Caterpillar</Name>
+            <Name>Delia</Name>
             <AgentStart>
                 <Placement x="0.5" y="227.0" z="0.5"/>
                 <Inventory>
-                    <InventoryBlock type="brown_mushroom" quantity="10" slot="0"/>
-                    <InventoryBlock type="planks" quantity="10" slot="1"/>
                 </Inventory>
             </AgentStart>
             <AgentHandlers>
                 <RewardForCollectingItem>
-                    <Item reward="2" type="fish porkchop beef chicken rabbit mutton"/>
-                    <Item reward="1" type="potato egg carrot"/>
-                    <Item reward="-1" type="apple melon"/>
-                    <Item reward="-2" type="sugar cake cookie pumpkin_pie"/>
+                    <Item reward="10" type="planks" variant="spruce dark_oak" />
+                    <Item reward="100" type="cooked_rabbit carrot baked_potato brown_mushroom"/>
+                    <Item reward="500" type="bowl"/>
+                    <Item reward="1000" type="rabbit_stew"/>
                 </RewardForCollectingItem>
+                <RewardForDiscardingItem>
+                    <Item reward="-2" type="planks"/>
+                    <Item reward="-6" type="cooked_rabbit carrot baked_potato brown_mushroom"/>
+                </RewardForDiscardingItem>
                 <ContinuousMovementCommands turnSpeedDegs="480"/>
                 <SimpleCraftCommands/>
+                <InventoryCommands/>
                 <ObservationFromSubgoalPositionList>''' + getSubgoalPositions(positions) + '''
                 </ObservationFromSubgoalPositionList>
                 <ObservationFromFullInventory/>
+                <AgentQuitFromCollectingItem>
+                    <Item type="rabbit_stew" description="Supper's Up!!"/>
+                </AgentQuitFromCollectingItem>
             </AgentHandlers>
         </AgentSection>
 
     </Mission>'''
-  
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+   
+if sys.version_info[0] == 2:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+else:
+    import functools
+    print = functools.partial(print, flush=True)
 
 validate = True
+
+# Expected reward made up as follows (see RewardForCollectingItem, above)
+# POSITIVE REWARDS:
+#   2 * 10 for collecting planks = 20 (only rewarded for spruce and dark_oak planks, not for birch)
+#   100 each for collecting rabbit, carrot, potato and mushrooms = 400
+#   4 * 500 for crafting wooden bowls = 2000
+#   Crafting the rabbit stew = 1000
+# NEGATIVE REWARDS:
+#   3 * -2 for losing the planks (during crafting) = -6
+#   -6 each for losing the rabbit, carrot, potato and mushrooms (during crafting) = -24
+# TOTAL: 3390
+expected_reward = 3390
+
 # Create a pool of Minecraft Mod clients.
 # By default, mods will choose consecutive mission control ports, starting at 10000,
 # so running four mods locally should produce the following pool by default (assuming nothing else
@@ -144,11 +217,11 @@ agent_host = MalmoPython.AgentHost()
 try:
     agent_host.parse( sys.argv )
 except RuntimeError as e:
-    print 'ERROR:',e
-    print agent_host.getUsage()
+    print('ERROR:',e)
+    print(agent_host.getUsage())
     exit(1)
 if agent_host.receivedArgument("help"):
-    print agent_host.getUsage()
+    print(agent_host.getUsage())
     exit(0)
 
 if agent_host.receivedArgument("test"):
@@ -158,8 +231,7 @@ else:
 
 for iRepeat in range(num_reps):
     my_mission = MalmoPython.MissionSpec(GetMissionXML("Crafty #" + str(iRepeat)),validate)
-    # Set up a recording - MUST be done once for each mission - don't do this outside the loop!
-    my_mission_record = MalmoPython.MissionRecordSpec()
+    my_mission_record = MalmoPython.MissionRecordSpec() # Records nothing by default
     max_retries = 3
     for retry in range(max_retries):
         try:
@@ -168,24 +240,26 @@ for iRepeat in range(num_reps):
             break
         except RuntimeError as e:
             if retry == max_retries - 1:
-                print "Error starting mission",e
-                print "Is the game running?"
+                print("Error starting mission",e)
+                print("Is the game running?")
                 exit(1)
             else:
                 time.sleep(2)
 
     world_state = agent_host.getWorldState()
-    while not world_state.is_mission_running:
+    while not world_state.has_mission_begun:
         time.sleep(0.1)
         world_state = agent_host.getWorldState()
 
+    total_reward = 0
     # main loop:
     agent_host.sendCommand( "move 1" )
-    print "Collecting ingredients..."
+    print("Collecting ingredients...")
     while world_state.is_mission_running:
         if world_state.number_of_observations_since_last_state > 0:
             msg = world_state.observations[-1].text
             ob = json.loads(msg)
+            # printInventory(ob)
             if u'yawDelta' in ob:
                 current_yaw_delta = ob.get(u'yawDelta', 0)
                 agent_host.sendCommand( "turn " + str(current_yaw_delta) )
@@ -193,16 +267,38 @@ for iRepeat in range(num_reps):
             else:
                 agent_host.sendCommand("move 0")
                 agent_host.sendCommand("turn 0")
-                if checkInventoryForBowlIngredients(ob):
-                    print "Crafting a bowl..."
+                if checkInventoryForItem(ob, "rabbit"):
+                    print("Cooking the rabbit...")
+                    checkFuelPosition(ob, agent_host)
+                    agent_host.sendCommand("craft cooked_rabbit")
+                    time.sleep(1)
+                elif checkInventoryForItem(ob, "potato"):
+                    print("Cooking the potato...")
+                    checkFuelPosition(ob, agent_host)
+                    agent_host.sendCommand("craft baked_potato")
+                    time.sleep(1)
+                elif checkInventoryForBowlIngredients(ob):
+                    print("Crafting a bowl...")
                     agent_host.sendCommand("craft bowl")
                     time.sleep(1)
                 elif checkInventoryForStewIngredients(ob):
-                    print "Crafting a stew..."
+                    print("Crafting a stew...")
                     agent_host.sendCommand("craft rabbit_stew")
+                    time.sleep(1)
+        if world_state.number_of_rewards_since_last_state > 0:
+            reward = world_state.rewards[-1].getValue()
+            print("Reward: " + str(reward))
+            total_reward += reward
         world_state = agent_host.getWorldState()
         
     # mission has ended.
     for error in world_state.errors:
-        print "Error:",error.text
+        print("Error:",error.text)
+    if world_state.number_of_rewards_since_last_state > 0:
+        reward = world_state.rewards[-1].getValue()
+        print("Final reward: " + str(reward))
+        total_reward += reward
+    print("Total Reward: " + str(total_reward))
+    if total_reward < expected_reward:  # reward may be greater than expected due to items not getting cleared between runs
+        print("Total reward did not match up to expected reward - did the crafting work?")
     time.sleep(0.5) # Give the mod a little time to prepare for the next mission.

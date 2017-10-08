@@ -1,3 +1,4 @@
+from __future__ import print_function
 # ------------------------------------------------------------------------------------------------
 # Copyright (c) 2016 Microsoft Corporation
 # 
@@ -26,6 +27,8 @@ agent_host.setObservationsPolicy( MalmoPython.ObservationsPolicy.LATEST_OBSERVAT
 
 world_state = agent_host.getWorldState()
 
+assert not world_state.has_mission_begun, 'World state says mission has already begun.'
+
 assert not world_state.is_mission_running, 'World state says mission is already running.'
 
 assert world_state.number_of_observations_since_last_state == 0, 'World state says observations already received.'
@@ -40,4 +43,4 @@ assert len( world_state.rewards ) == 0, 'World state has rewards stored.'
 
 assert len( world_state.video_frames ) == 0, 'World state has video frames stored.'
 
-print agent_host.getUsage()
+print(agent_host.getUsage())

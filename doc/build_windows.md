@@ -10,7 +10,7 @@
     3. Add `C:\ffmpeg\bin` to your `PATH` ([How To](https://support.microsoft.com/en-us/kb/310519))
     4. Check that typing `ffmpeg` at a command prompt works.
 
-3. Install git and Visual Studio and Python 2.7 (64-bit) and the JDK (64-bit). Hints:
+3. Install git and Visual Studio and [Python 2.7 (64-bit)](https://www.python.org/ftp/python/2.7.12/python-2.7.12.amd64.msi) and the JDK (64-bit). Hints:
     1. Get the latest Windows git from https://git-scm.com/downloads
     2. Check that git and msbuild and python are on your path.  
        N.B. MSBuild lives in an odd place: e.g. `C:\Program Files (x86)\MSBuild\12.0\Bin`
@@ -51,7 +51,7 @@
     2. Install to the default location. You don't need to set up the VS search paths.
     
 9. Install xsltproc:
-    1. Visit ftp://ftp.zlatkovic.com/libxml/ and download libxslt, libxml2, zlib and iconv:
+    1. Visit ftp://ftp.zlatkovic.com/libxml/ and download libxslt, libxml2, zlib and iconv: _(NOTE: the zlatkovic site has been down for a while - you can also get the binaries from http://xmlsoft.org/sources/win32/)_
         1. Download e.g. `libxslt-1.1.26.win32.zip` and extract to `C:\XSLT`
         2. Download e.g. `libxml2-2.7.8.win32.zip` and extract to `C:\XSLT`
         3. Download e.g. `zlib-1.2.5.win32.zip` and extract to `C:\XSLT`
@@ -63,10 +63,7 @@
     3. Copy `C:\XSLT\zlib-1.2.5\bin\zlib1.dll` to `C:\XSLT\libxslt-1.1.26.win32\bin`
     4. Check that running `xsltproc` from a new command prompt works, printing the options.
 
-10. Install the SlimDX SDK:
-    1. Visit https://slimdx.org/download.php and download the SDK.
-
-11. Build Malmo:
+10. Build Malmo:
     1. Open a Visual Studio 2013 x64 command prompt
     2. `mkdir MalmoPlatform` (wherever you want)
     3. `cd MalmoPlatform`
@@ -83,14 +80,14 @@
         You can then run the samples from e.g. `install\Python_Examples`  
         If you want to use Visual Studio to build, open `Malmo.sln`.
  
-12. Test Malmo:
+11. Test Malmo:
     1. After building Debug: `ctest -C Debug`
     2. After building Release: `ctest -C Release`
     3. Add `-E Integration` to exclude the integration tests.
     4. Add `-VV` to get verbose output.
     5. Or build the RUN_TESTS project in Visual Studio and look in the Output tab.
 
-13. Make a distributable:
+12. Make a distributable:
     1. Run all the tests.
     2. Change the version number in CMakeLists.txt and Minecraft/src/main/java/com/microsoft/Malmo/MalmoMod.java, and commit.
     3. `msbuild PACKAGE.vcxproj /p:Configuration=Release`

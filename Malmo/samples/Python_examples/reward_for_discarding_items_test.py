@@ -1,3 +1,4 @@
+from __future__ import print_function
 # ------------------------------------------------------------------------------------------------
 # Copyright (c) 2016 Microsoft Corporation
 # 
@@ -20,6 +21,7 @@
 # Sample to demonstrate use of the RewardForDiscardingItem mission handler, and the DiscardCurrentItem command.
 # Leaves a trail of bread-crumbs.
 
+from builtins import range
 import MalmoPython
 import os
 import random
@@ -76,7 +78,11 @@ def SetVelocity(vel):
 def SetTurn(turn):
     agent_host.sendCommand( "turn " + str(turn) )
 
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+if sys.version_info[0] == 2:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+else:
+    import functools
+    print = functools.partial(print, flush=True)
 
 validate = True
 # Create a pool of Minecraft Mod clients.
@@ -93,11 +99,11 @@ agent_host = MalmoPython.AgentHost()
 try:
     agent_host.parse( sys.argv )
 except RuntimeError as e:
-    print 'ERROR:',e
-    print agent_host.getUsage()
+    print('ERROR:',e)
+    print(agent_host.getUsage())
     exit(1)
 if agent_host.receivedArgument("help"):
-    print agent_host.getUsage()
+    print(agent_host.getUsage())
     exit(0)
 
 if agent_host.receivedArgument("test"):
@@ -107,7 +113,7 @@ else:
 
 for iRepeat in range(num_reps):
     my_mission = MalmoPython.MissionSpec(GetMissionXML("Let them eat fish/cookies #" + str(iRepeat)),validate)
-    # Set up a recording - MUST be done once for each mission - don't do this outside the loop!
+    # Set up a recording
     my_mission_record = MalmoPython.MissionRecordSpec()
     max_retries = 3
     for retry in range(max_retries):
@@ -117,14 +123,14 @@ for iRepeat in range(num_reps):
             break
         except RuntimeError as e:
             if retry == max_retries - 1:
-                print "Error starting mission",e
-                print "Is the game running?"
+                print("Error starting mission",e)
+                print("Is the game running?")
                 exit(1)
             else:
                 time.sleep(2)
 
     world_state = agent_host.getWorldState()
-    while not world_state.is_mission_running:
+    while not world_state.has_mission_begun:
         time.sleep(0.1)
         world_state = agent_host.getWorldState()
 
@@ -168,7 +174,7 @@ for iRepeat in range(num_reps):
         time.sleep(0.1)
         
     # mission has ended.
-    print "Mission " + str(iRepeat+1) + ": Reward = " + str(reward)
+    print("Mission " + str(iRepeat+1) + ": Reward = " + str(reward))
     for error in world_state.errors:
-        print "Error:",error.text
+        print("Error:",error.text)
     time.sleep(0.5) # Give the mod a little time to prepare for the next mission.

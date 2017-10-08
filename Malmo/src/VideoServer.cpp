@@ -26,12 +26,13 @@
 
 namespace malmo 
 {
-    VideoServer::VideoServer( boost::asio::io_service& io_service, int port, short width, short height, short channels, const boost::function<void(TimestampedVideoFrame message)> handle_frame )
+    VideoServer::VideoServer( boost::asio::io_service& io_service, int port, short width, short height, short channels, TimestampedVideoFrame::FrameType frametype, const boost::function<void(TimestampedVideoFrame message)> handle_frame )
         : handle_frame( handle_frame )
         , width( width )
         , height( height )
         , channels( channels )
-        , server( io_service, port, boost::bind( &VideoServer::handleMessage, this, _1 ) )
+        , frametype( frametype )
+        , server( io_service, port, boost::bind( &VideoServer::handleMessage, this, _1 ), "vid" )
     {
     }
 
@@ -58,21 +59,38 @@ namespace malmo
     }
 
     VideoServer& VideoServer::recordMP4(std::string path, int frames_per_second, int64_t bit_rate)
-    {        
-        this->writers.push_back(VideoFrameWriter::create(path, this->width, this->height, frames_per_second, bit_rate));
+    {
+        std::string filename;
+        switch (this->frametype)
+        {
+        case TimestampedVideoFrame::COLOUR_MAP:
+            filename = "colour_map_info.txt";
+            break;
+        case TimestampedVideoFrame::DEPTH_MAP:
+            filename = "depth_frame_info.txt";
+            break;
+        case TimestampedVideoFrame::LUMINANCE:
+            filename = "luminance_frame_info.txt";
+            break;
+        case TimestampedVideoFrame::VIDEO:
+        default:
+            filename = "frame_info.txt";
+            break;
+        }
+        this->writers.push_back(VideoFrameWriter::create(path, filename, this->width, this->height, frames_per_second, bit_rate));
 
         return *this;
     }
     
     void VideoServer::handleMessage( TimestampedUnsignedCharVector message )
     {
-        if (message.data.size() != this->width * this->height * this->channels) 
+        if (message.data.size() != TimestampedVideoFrame::FRAME_HEADER_SIZE + this->width * this->height * this->channels)
         {
             // Have seen this happen during stress testing when a reward packet from (I think) a previous mission arrives during the next
             // one when the same port has been reassigned. Could throw here but chose to silently ignore since very rare.
             return;
         }
-        TimestampedVideoFrame frame(this->width, this->height, this->channels, message, TimestampedVideoFrame::REVERSE_SCANLINE);
+        TimestampedVideoFrame frame(this->width, this->height, this->channels, message, TimestampedVideoFrame::REVERSE_SCANLINE, this->frametype);
         this->handle_frame(frame);
         
         for (const auto& writer : this->writers){
@@ -100,5 +118,10 @@ namespace malmo
     short VideoServer::getChannels() const
     {
         return this->channels;
+    }
+
+    TimestampedVideoFrame::FrameType VideoServer::getFrameType() const
+    {
+        return this->frametype;
     }
 }

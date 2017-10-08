@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import division
 # ------------------------------------------------------------------------------------------------
 # Copyright (c) 2016 Microsoft Corporation
 # 
@@ -17,13 +19,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # ------------------------------------------------------------------------------------------------
 
+from builtins import range
+from past.utils import old_div
 import MalmoPython
+import json
+import math
 import os
 import random
 import sys
 import time
-import json
-import random
 
 #-------------------------------------------------------------------------------------------------------------------------------------
 #Very simple script to test drawing code - starts a mission in order to draw, but quits after a second.
@@ -35,9 +39,9 @@ def Menger(xorg, yorg, zorg, size, blocktype, holetype):
     #now remove holes
     unit = size
     while (unit >= 3):
-        w=unit/3
-        for i in xrange(0, size, unit):
-            for j in xrange(0, size, unit):
+        w=old_div(unit,3)
+        for i in range(0, size, unit):
+            for j in range(0, size, unit):
                 x=xorg+i
                 y=yorg+j
                 genstring += GenCuboid(x+w,y+w,zorg,(x+2*w)-1,(y+2*w)-1,zorg+size-1,holetype) + "\n"
@@ -47,7 +51,7 @@ def Menger(xorg, yorg, zorg, size, blocktype, holetype):
                 genstring += GenCuboid(x+w,yorg,z+w,(x+2*w)-1,yorg+size-1,(z+2*w)-1,holetype) + "\n"
                 if (w == 1):
                     genstring += GenItem(x+w, yorg+size+100, z+w, "diamond") + "\n"
-        unit/=3
+        unit = w
     return genstring
 
 def GenCuboid(x1, y1, z1, x2, y2, z2, blocktype):
@@ -101,25 +105,44 @@ missionXML = '''<?xml version="1.0" encoding="UTF-8" ?>
         <AgentSection mode="Survival">
             <Name>The Explorer</Name>
             <AgentStart>
-                <Placement x="0.5" y="86.0" z="420.5"/>
+                <Placement x="0.5" y="83.0" z="420.5"/>
             </AgentStart>
             <AgentHandlers>
+                <ObservationFromFullStats/>
+                <ObservationFromGrid>
+                    <Grid name="nearby">
+                        <min x="-1" y="-1" z="-1"/>
+                        <max x="1" y="-1" z="1"/>
+                    </Grid>
+                    <Grid name="far" absoluteCoords="true">
+                        <min x="12" y="79" z="417"/>
+                        <max x="14" y="79" z="419"/>
+                    </Grid>
+                    <Grid name="very_far" absoluteCoords="true">
+                        <min x="-10711" y="55" z="347"/>
+                        <max x="-10709" y="55" z="349"/>
+                    </Grid>
+                </ObservationFromGrid>
             </AgentHandlers>
         </AgentSection>
 
     </Mission>'''
 
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+if sys.version_info[0] == 2:
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)  # flush print output immediately
+else:
+    import functools
+    print = functools.partial(print, flush=True)
 my_mission = MalmoPython.MissionSpec(missionXML,True)
 agent_host = MalmoPython.AgentHost()
 try:
     agent_host.parse( sys.argv )
 except RuntimeError as e:
-    print 'ERROR:',e
-    print agent_host.getUsage()
+    print('ERROR:',e)
+    print(agent_host.getUsage())
     exit(1)
 if agent_host.receivedArgument("help"):
-    print agent_host.getUsage()
+    print(agent_host.getUsage())
     exit(0)
 
 my_mission_record = MalmoPython.MissionRecordSpec()
@@ -130,19 +153,35 @@ for retry in range(max_retries):
         break
     except RuntimeError as e:
         if retry == max_retries - 1:
-            print "Error starting mission",e
-            print "Is the game running?"
+            print("Error starting mission",e)
+            print("Is the game running?")
             exit(1)
         else:
             time.sleep(2)
 
-world_state = agent_host.getWorldState()
-while not world_state.is_mission_running:
+world_state = agent_host.peekWorldState()
+while not world_state.has_mission_begun:
     time.sleep(0.1)
-    world_state = agent_host.getWorldState()
+    world_state = agent_host.peekWorldState()
     
 while world_state.is_mission_running:
-    world_state = agent_host.getWorldState()
+    world_state = agent_host.peekWorldState()
+
+# We also use this sample as a test. In this section we verify that
+# the expected things were received.
+if agent_host.receivedArgument("test"):
+    # check the height of the player in the last observation    
+    assert len(world_state.observations) > 0, 'No observations received'
+    obs = json.loads( world_state.observations[-1].text )
+    player_y = obs[u'YPos']
+    print('Player at y =',player_y)
+    assert math.fabs( player_y - 83.0 ) < 0.01, 'Player not at expected height'
+    
+    # check the grid observations
+    for obs in world_state.observations:
+        assert '"nearby":["air","quartz_block","quartz_block","air","wool","wool","air","wool","air"]' in obs.text, 'Nearby observation incorrect:'+obs.text
+        assert '"far":["ice","ice","air","ice","ice","air","quartz_block","quartz_block","quartz_block"]' in obs.text, 'Far observation incorrect:'+obs.text
+        assert '"very_far":["stained_glass","stained_glass","stained_glass","stained_glass","stained_glass","stained_glass","stained_glass","stained_glass","stained_glass"]' in obs.text, 'Vey far observation incorrect:'+obs.text
 
 # mission has ended.
-print "Mission over - feel free to explore the world."
+print("Mission over - feel free to explore the world.")

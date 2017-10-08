@@ -52,6 +52,10 @@ namespace malmo
             //! Destructor
             ~ALEAgentHost();
 
+            //! Set the random seed used to seed the ALE.
+            //! If 0 (the default), the ALE will use the current time instead.
+            void setSeed(int seed) { this->seed = seed; }
+
             //! Starts a mission running. Throws an exception if something goes wrong.
             //! \param mission The mission specification.
             //! \param client_pool leave this null - meaningless for ALE
@@ -72,6 +76,10 @@ namespace malmo
             //! Gets the latest world state received from the game. Resets the count of items received since the last time.
             //! \returns The world state.
             WorldState getWorldState();
+
+            //! Gets the temporary directory being used for the mission record, if recording is taking place.
+            //! \returns The temporary directory for the mission record, or an empty string if no recording is going on.
+            std::string getRecordingTemporaryDirectory() const;
 
             //! Specifies how you want to deal with multiple video frames.
             //! \param videoPolicy How you want to deal with multiple video frames coming in asynchronously.
@@ -97,7 +105,7 @@ namespace malmo
             void initialize(const MissionSpec& mission, const MissionRecordSpec& mission_record, int role, std::string unique_experiment_id);
 
             void onVideo(TimestampedVideoFrame message);
-            void onReward(TimestampedReward message);
+            void onReward(boost::posix_time::ptime ts, float reward);
             void onObservation(TimestampedString message);
 
             AgentHost::VideoPolicy        video_policy;
@@ -116,6 +124,7 @@ namespace malmo
             int requested_height;
             std::ofstream commands_stream;
             std::ofstream reward_stream;
+            int seed;
     };
 }
 

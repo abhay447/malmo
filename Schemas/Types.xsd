@@ -3,13 +3,16 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            targetNamespace="http://ProjectMalmo.microsoft.com"
            xmlns="http://ProjectMalmo.microsoft.com"
+           xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
            elementFormDefault="qualified"
-           version="0.14">
+           jaxb:version="2.1"
+           version="0.31">
 
 <xs:simpleType name="Colour">
     <xs:annotation>
       <xs:documentation>
-        The sixteen block colours allowed in the Minecraft world.
+        The sixteen block colours allowed in the Minecraft world: {{{WHITE}}}, {{{ORANGE}}}, {{{MAGENTA}}}, {{{LIGHT_BLUE}}}, {{{YELLOW}}}, {{{LIME}}}, {{{PINK}}},
+        {{{GRAY}}}, {{{SILVER}}}, {{{CYAN}}}, {{{PURPLE}}}, {{{BLUE}}}, {{{BROWN}}}, {{{GREEN}}}, {{{RED}}}, {{{BLACK}}}.
       </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
@@ -35,7 +38,7 @@
 <xs:simpleType name="Facing">
     <xs:annotation>
       <xs:documentation>
-        Enum to specify block faces.
+        Enum to specify block faces: {{{DOWN}}}, {{{UP}}}, {{{NORTH}}}, {{{SOUTH}}}, {{{WEST}}}, {{{EAST}}}, {{{UP_X}}}, {{{DOWN_X}}}, {{{UP_Z}}}, {{{DOWN_Z}}}.
       </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
@@ -55,7 +58,7 @@
 <xs:simpleType name="ItemType">
     <xs:annotation>
       <xs:documentation>
-        The 188 types of item allowed in the Minecraft world.
+        The types of item allowed in the Minecraft world.
       </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
@@ -235,6 +238,26 @@
         <xs:enumeration value="jungle_door" />
         <xs:enumeration value="acacia_door" />
         <xs:enumeration value="dark_oak_door" />
+        <xs:enumeration value="chorus_fruit" />
+        <xs:enumeration value="chorus_fruit_popped" />
+        <xs:enumeration value="beetroot" />
+        <xs:enumeration value="beetroot_seeds" />
+        <xs:enumeration value="beetroot_soup" />
+        <xs:enumeration value="dragon_breath" />
+        <xs:enumeration value="splash_potion" />
+        <xs:enumeration value="spectral_arrow" />
+        <xs:enumeration value="tipped_arrow" />
+        <xs:enumeration value="lingering_potion" />
+        <xs:enumeration value="shield" />
+        <xs:enumeration value="elytra" />
+        <xs:enumeration value="spruce_boat" />
+        <xs:enumeration value="birch_boat" />
+        <xs:enumeration value="jungle_boat" />
+        <xs:enumeration value="acacia_boat" />
+        <xs:enumeration value="dark_oak_boat" />
+        <xs:enumeration value="totem_of_undying" />
+        <xs:enumeration value="shulker_shell" />
+        <xs:enumeration value="iron_nugget" />
         <xs:enumeration value="record_13" />
         <xs:enumeration value="record_cat" />
         <xs:enumeration value="record_blocks" />
@@ -253,8 +276,8 @@
 <xs:simpleType name="BlockType">
     <xs:annotation>
       <xs:documentation>
-        The 198 block types allowed in the Minecraft world.
-      </xs:documentation>
+        The block types allowed in the Minecraft world.
+       </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
         <xs:enumeration value="air" />
@@ -455,17 +478,89 @@
         <xs:enumeration value="jungle_door" />
         <xs:enumeration value="acacia_door" />
         <xs:enumeration value="dark_oak_door" />
+        <xs:enumeration value="end_rod" />
+        <xs:enumeration value="chorus_plant" />
+        <xs:enumeration value="chorus_flower" />
+        <xs:enumeration value="purpur_block" />
+        <xs:enumeration value="purpur_pillar" />
+        <xs:enumeration value="purpur_stairs" />
+        <xs:enumeration value="purpur_double_slab" />
+        <xs:enumeration value="purpur_slab" />
+        <xs:enumeration value="end_bricks" />
+        <xs:enumeration value="beetroots" />
+        <xs:enumeration value="grass_path" />
+        <xs:enumeration value="end_gateway" />
+        <xs:enumeration value="repeating_command_block" />
+        <xs:enumeration value="chain_command_block" />
+        <xs:enumeration value="frosted_ice" />
+        <xs:enumeration value="magma" />
+        <xs:enumeration value="nether_wart_block" />
+        <xs:enumeration value="red_nether_brick" />
+        <xs:enumeration value="bone_block" />
+        <xs:enumeration value="structure_void" />
+        <xs:enumeration value="observer" />
+        <xs:enumeration value="white_shulker_box" />
+        <xs:enumeration value="orange_shulker_box" />
+        <xs:enumeration value="magenta_shulker_box" />
+        <xs:enumeration value="light_blue_shulker_box" />
+        <xs:enumeration value="yellow_shulker_box" />
+        <xs:enumeration value="lime_shulker_box" />
+        <xs:enumeration value="pink_shulker_box" />
+        <xs:enumeration value="gray_shulker_box" />
+        <xs:enumeration value="silver_shulker_box" />
+        <xs:enumeration value="cyan_shulker_box" />
+        <xs:enumeration value="purple_shulker_box" />
+        <xs:enumeration value="blue_shulker_box" />
+        <xs:enumeration value="brown_shulker_box" />
+        <xs:enumeration value="green_shulker_box" />
+        <xs:enumeration value="red_shulker_box" />
+        <xs:enumeration value="black_shulker_box" />
+        <xs:enumeration value="structure_block" />
     </xs:restriction>
 </xs:simpleType>
 
-<xs:simpleType name="BlockVariant">
+<xs:simpleType name="BlockOrItem">
+  <xs:union memberTypes="BlockType ItemType"/>
+</xs:simpleType>
+
+<xs:simpleType name="ContainerType">
+  <xs:annotation>
+    <xs:documentation>
+      Subset of the block types which act as containers, for use in DrawContainer object
+    </xs:documentation>
+  </xs:annotation>
+  <xs:restriction base="xs:string">
+    <xs:enumeration value="dispenser" />
+    <xs:enumeration value="chest" />
+    <xs:enumeration value="trapped_chest" />
+    <xs:enumeration value="hopper" />
+    <xs:enumeration value="dropper" />
+    <xs:enumeration value="white_shulker_box" />
+    <xs:enumeration value="orange_shulker_box" />
+    <xs:enumeration value="magenta_shulker_box" />
+    <xs:enumeration value="light_blue_shulker_box" />
+    <xs:enumeration value="yellow_shulker_box" />
+    <xs:enumeration value="lime_shulker_box" />
+    <xs:enumeration value="pink_shulker_box" />
+    <xs:enumeration value="gray_shulker_box" />
+    <xs:enumeration value="silver_shulker_box" />
+    <xs:enumeration value="cyan_shulker_box" />
+    <xs:enumeration value="purple_shulker_box" />
+    <xs:enumeration value="blue_shulker_box" />
+    <xs:enumeration value="brown_shulker_box" />
+    <xs:enumeration value="green_shulker_box" />
+    <xs:enumeration value="red_shulker_box" />
+    <xs:enumeration value="black_shulker_box" />
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="StoneTypes">
     <xs:annotation>
       <xs:documentation>
-        Variants of the block types - non-exhaustive list, and only applicable to some block types.
+        Types of stone for stone blocks/items
       </xs:documentation>
     </xs:annotation>
     <xs:restriction base="xs:string">
-        <!-- Applicable to stone blocks: -->
         <xs:enumeration value="stone" />
         <xs:enumeration value="granite" />
         <xs:enumeration value="smooth_granite" />
@@ -473,7 +568,16 @@
         <xs:enumeration value="smooth_diorite" />
         <xs:enumeration value="andesite" />
         <xs:enumeration value="smooth_andesite" />
-        <!-- Applicable to wood blocks: -->
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="WoodTypes">
+    <xs:annotation>
+      <xs:documentation>
+        Types of wood for wooden blocks/items
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
         <xs:enumeration value="oak" />
         <xs:enumeration value="spruce" />
         <xs:enumeration value="birch" />
@@ -481,6 +585,250 @@
         <xs:enumeration value="acacia" />
         <xs:enumeration value="dark_oak" />
     </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="FlowerTypes">
+    <xs:annotation>
+        <xs:documentation>
+            Types of flower
+        </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="dandelion" />
+        <xs:enumeration value="poppy" />
+        <xs:enumeration value="blue_orchid" />
+        <xs:enumeration value="allium" />
+        <xs:enumeration value="houstonia" />
+        <xs:enumeration value="red_tulip" />
+        <xs:enumeration value="orange_tulip" />
+        <xs:enumeration value="white_tulip" />
+        <xs:enumeration value="pink_tulip" />
+        <xs:enumeration value="oxeye_daisy" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="MonsterEggTypes">
+    <xs:annotation>
+        <xs:documentation>
+            Types of monster egg blocks
+        </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="cobblestone" />
+        <xs:enumeration value="stone_brick" />
+        <xs:enumeration value="mossy_brick" />
+        <xs:enumeration value="cracked_brick" />
+        <xs:enumeration value="chiseled_brick" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="ShapeTypes">
+    <xs:annotation>
+        <xs:documentation>
+            Shapes for, eg, rails
+        </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="north_south" />
+        <xs:enumeration value="east_west" />
+        <xs:enumeration value="north_east" />
+        <xs:enumeration value="north_west" />
+        <xs:enumeration value="south_east" />
+        <xs:enumeration value="south_west" />
+        <xs:enumeration value="ascending_east" />
+        <xs:enumeration value="ascending_west" />
+        <xs:enumeration value="ascending_north" />
+        <xs:enumeration value="ascending_south" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="HalfTypes">
+    <xs:annotation>
+        <xs:documentation>
+            Specify which half - for stairs or double blocks (doors, tall flowers, etc)
+        </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <!-- for stairs -->
+        <xs:enumeration value="top" />
+        <xs:enumeration value="bottom" />
+        <!-- for bed -->
+        <xs:enumeration value="head" />
+        <xs:enumeration value="foot" />
+        <!-- for doors -->
+        <xs:enumeration value="upper" />
+        <xs:enumeration value="lower" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="EntityTypes">
+    <xs:annotation>
+      <xs:documentation>
+        Types of entity for eggs, spawners etc.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="ElderGuardian" />
+        <xs:enumeration value="WitherSkeleton" />
+        <xs:enumeration value="Stray" />
+        <xs:enumeration value="Husk" />
+        <xs:enumeration value="ZombieVillager" />
+        <xs:enumeration value="SkeletonHorse" />
+        <xs:enumeration value="ZombieHorse" />
+        <xs:enumeration value="EvocationIllager" />
+        <xs:enumeration value="VindicationIllager" />
+        <xs:enumeration value="Vex" />
+        <xs:enumeration value="Creeper" />
+        <xs:enumeration value="Skeleton" />
+        <xs:enumeration value="Spider" />
+        <xs:enumeration value="Giant" />
+        <xs:enumeration value="Zombie" />
+        <xs:enumeration value="Slime" />
+        <xs:enumeration value="Ghast" />
+        <xs:enumeration value="PigZombie" />
+        <xs:enumeration value="Enderman" />
+        <xs:enumeration value="CaveSpider" />
+        <xs:enumeration value="Silverfish" />
+        <xs:enumeration value="Blaze" />
+        <xs:enumeration value="LavaSlime" />    <!-- Magma Cube -->
+        <xs:enumeration value="EnderDragon" />
+        <xs:enumeration value="WitherBoss" />
+        <xs:enumeration value="Bat" />
+        <xs:enumeration value="Witch" />
+        <xs:enumeration value="Endermite" />
+        <xs:enumeration value="Guardian" />
+        <xs:enumeration value="Shulker" />
+        <xs:enumeration value="Donkey" />
+        <xs:enumeration value="Mule" />
+        <xs:enumeration value="Pig" />
+        <xs:enumeration value="Sheep" />
+        <xs:enumeration value="Cow" />
+        <xs:enumeration value="Chicken" />
+        <xs:enumeration value="Squid" />
+        <xs:enumeration value="Wolf" />
+        <xs:enumeration value="MushroomCow" />
+        <xs:enumeration value="SnowMan" />
+        <xs:enumeration value="Ozelot" />
+        <xs:enumeration value="VillagerGolem" />
+        <xs:enumeration value="Horse" />
+        <xs:enumeration value="Rabbit" />
+        <xs:enumeration value="PolarBear" />
+        <xs:enumeration value="Llama" />
+        <xs:enumeration value="Villager" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="NonLivingEntityTypes">
+    <xs:annotation>
+      <xs:documentation>
+        Non-living entities, such as boats, minecarts etc.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="MinecartRideable" />
+        <xs:enumeration value="MinecartChest" />
+        <xs:enumeration value="MinecartFurnace" />
+        <xs:enumeration value="MinecartTNT" />
+        <xs:enumeration value="MinecartSpawner" />
+        <xs:enumeration value="MinecartHopper" />
+        <xs:enumeration value="MinecartCommandBlock" />
+        <xs:enumeration value="Boat" />
+        <xs:enumeration value="ArmorStand" />
+        <xs:enumeration value="ItemFrame" />
+        <xs:enumeration value="EnderCrystal" />
+        <xs:enumeration value="LeashKnot" />
+        <xs:enumeration value="Painting" />
+        <xs:enumeration value="PrimedTnt" />
+        <xs:enumeration value="FallingSand" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="ProjectileEntityTypes">
+    <xs:annotation>
+      <xs:documentation>
+        Non-living entities which tend to represent projectiles thrown by other mobs, etc.
+        Doesn't make much sense to spawn/draw these, but the agent could encounter them in the wild.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="XPOrb" />
+        <xs:enumeration value="AreaEffectCloud" />
+        <xs:enumeration value="ThrownEgg" />
+        <xs:enumeration value="Arrow" />
+        <xs:enumeration value="Snowball" />
+        <xs:enumeration value="Fireball" />
+        <xs:enumeration value="SmallFireball" />
+        <xs:enumeration value="ThrownEnderpearl" />
+        <xs:enumeration value="EyeOfEnderSignal" />
+        <xs:enumeration value="ThrownPotion" />
+        <xs:enumeration value="ThrownExpBottle" />
+        <xs:enumeration value="WitherSkull" />
+        <xs:enumeration value="FireworksRocketEntity" />
+        <xs:enumeration value="SpectralArrow" />
+        <xs:enumeration value="ShulkerBullet" />
+        <xs:enumeration value="DragonFireball" />
+        <xs:enumeration value="EvocationFangs" />
+        <xs:enumeration value="LlamaSpit" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="NoteTypes">
+    <xs:annotation>
+      <xs:documentation>
+        Note values for creating tuned noteblocks
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="F_sharp_3" />
+        <xs:enumeration value="G3" />
+        <xs:enumeration value="G_sharp_3" />
+        <xs:enumeration value="A3" />
+        <xs:enumeration value="A_sharp_3" />
+        <xs:enumeration value="B3" />
+        <xs:enumeration value="C4" />
+        <xs:enumeration value="C_sharp_4" />
+        <xs:enumeration value="D4" />
+        <xs:enumeration value="D_sharp_4" />
+        <xs:enumeration value="E4" />
+        <xs:enumeration value="F4" />
+        <xs:enumeration value="F_sharp_4" />
+        <xs:enumeration value="G4" />
+        <xs:enumeration value="G_sharp_4" />
+        <xs:enumeration value="A4" />
+        <xs:enumeration value="A_sharp_4" />
+        <xs:enumeration value="B4" />
+        <xs:enumeration value="C5" />
+        <xs:enumeration value="C_sharp_5" />
+        <xs:enumeration value="D5" />
+        <xs:enumeration value="D_sharp_5" />
+        <xs:enumeration value="E5" />
+        <xs:enumeration value="F5" />
+        <xs:enumeration value="F_sharp_5" />
+    </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="SpawnableTypes">
+    <xs:annotation>
+        <xs:documentation>
+            An entity that can be placed using the DrawingDecorator.
+        </xs:documentation>
+        <xs:appinfo>
+            <jaxb:class name="SpawnableTypes"/>  <!-- needed or jaxb just binds it to a String -->
+        </xs:appinfo>
+    </xs:annotation>
+    <xs:union memberTypes="EntityTypes NonLivingEntityTypes"/>
+</xs:simpleType>
+
+<xs:simpleType name="Variation">
+    <xs:annotation>
+      <xs:documentation>
+        Variants of block types, item types, entities etc
+      </xs:documentation>
+      <xs:appinfo>
+        <jaxb:class name="Variation"/>   <!-- needed or jaxb just binds BlockVariant to a String -->
+      </xs:appinfo>
+    </xs:annotation>
+    <xs:union memberTypes="StoneTypes WoodTypes FlowerTypes EntityTypes ShapeTypes MonsterEggTypes HalfTypes NoteTypes"/>
 </xs:simpleType>
 
 </xs:schema>

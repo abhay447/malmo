@@ -27,14 +27,17 @@ import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
-import net.minecraft.util.BlockPos;
+import net.minecraft.util.math.BlockPos;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import com.microsoft.Malmo.MissionHandlerInterfaces.IWantToQuit;
+import com.microsoft.Malmo.MissionHandlers.RewardForCollectingItemImplementation.GainItemEvent;
 import com.microsoft.Malmo.Schemas.AgentQuitFromTouchingBlockType;
 import com.microsoft.Malmo.Schemas.BlockSpec;
 import com.microsoft.Malmo.Schemas.BlockSpecWithDescription;
 import com.microsoft.Malmo.Schemas.BlockType;
-import com.microsoft.Malmo.Schemas.BlockVariant;
+import com.microsoft.Malmo.Schemas.Variation;
 import com.microsoft.Malmo.Schemas.Colour;
 import com.microsoft.Malmo.Schemas.MissionInit;
 import com.microsoft.Malmo.Utils.PositionHelper;
@@ -44,6 +47,7 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 	AgentQuitFromTouchingBlockType params;
 	List<String> blockTypeNames;
 	String quitCode = "";
+	boolean wantToQuit = false;
 
 	@Override
 	public boolean parseParameters(Object params)
@@ -65,14 +69,23 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 		return true;
 	}
 
+    @SubscribeEvent
+    public void onDiscretePartialMoveEvent(DiscreteMovementCommandsImplementation.DiscretePartialMoveEvent event)
+    {
+        this.wantToQuit = doIWantToQuit(null);
+    }
+	
 	@Override
 	public boolean doIWantToQuit(MissionInit missionInit)
 	{
-		EntityPlayerSP player = Minecraft.getMinecraft().thePlayer;
+	    if (this.wantToQuit)
+	        return true;
+	    
+		EntityPlayerSP player = Minecraft.getMinecraft().player;
         List<BlockPos> touchingBlocks = PositionHelper.getTouchingBlocks(player);
         for (BlockPos pos : touchingBlocks)
         {
-        	IBlockState bs = player.worldObj.getBlockState(pos);
+        	IBlockState bs = player.world.getBlockState(pos);
         	// Does this block match our trigger specs?
         	String blockname = bs.getBlock().getUnlocalizedName().toLowerCase();
         	if (!this.blockTypeNames.contains(blockname))
@@ -118,9 +131,9 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 	{
 		if (blockspec.getVariant() == null || blockspec.getVariant().isEmpty())
 			return true;	// If nothing to match against, we pass.
-		for (BlockVariant v : blockspec.getVariant())
+		for (Variation v : blockspec.getVariant())
 		{
-			if (v.value().equalsIgnoreCase(blockVariant))
+			if (v.getValue().equalsIgnoreCase(blockVariant))
 				return true;
 		}
 		return false;
@@ -135,7 +148,7 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 
     	// Next, check for a colour match:
 		net.minecraft.item.EnumDyeColor blockColour = null;
-		for (IProperty prop : (java.util.Set<IProperty>)blockstate.getProperties().keySet())
+		for (IProperty prop : blockstate.getProperties().keySet())
 		{
 			if (prop.getName().equals("color") && prop.getValueClass() == net.minecraft.item.EnumDyeColor.class)
 			{
@@ -147,7 +160,7 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 
 		// Now check for the variant match:
 		Object blockVariant = null;
-        for (IProperty prop : (java.util.Set<IProperty>)blockstate.getProperties().keySet())
+        for (IProperty prop : blockstate.getProperties().keySet())
         {
             if (prop.getName().equals("variant") && prop.getValueClass().isEnum())
             {
@@ -161,13 +174,19 @@ public class AgentQuitFromTouchingBlockTypeImplementation extends HandlerBase im
 		return true;
 	}
 	
-	@Override
-    public void prepare(MissionInit missionInit) {}
+    @Override
+    public void prepare(MissionInit missionInit)
+    {
+        MinecraftForge.EVENT_BUS.register(this);
+    }
 
-	@Override
-    public void cleanup() {}
-	
-	@Override
+    @Override
+    public void cleanup()
+    {
+        MinecraftForge.EVENT_BUS.unregister(this);
+    }
+
+    @Override
 	public String getOutcome()
 	{
 		return this.quitCode;
